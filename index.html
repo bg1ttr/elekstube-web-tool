@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nixie Clock Control Center</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="header-content">
+                <span class="time">22:03</span>
+                <span class="title" data-i18n="title">Nixie Clock Control Center</span>
+                <select id="language-select">
+                    <option value="en">English</option>
+                    <option value="zh-TW">繁體中文</option>
+                    <option value="ja">日本語</option>
+                </select>
+            </div>
+        </header>
+        <main>
+            <div class="card" id="photo-settings">
+                <div class="card-content">
+                    <h2 data-i18n="photoSettings">Photo Settings</h2>
+                </div>
+            </div>
+            <div class="card" id="light-settings">
+                <div class="card-content">
+                    <h2 data-i18n="lightSettings">Light Settings</h2>
+                </div>
+            </div>
+            <div class="card" id="custom-dial">
+                <div class="card-content">
+                    <h2 data-i18n="customDial">Custom Dial</h2>
+                </div>
+            </div>
+            <div class="card" id="weather-settings">
+                <div class="card-content">
+                    <h2 data-i18n="weatherSettings">Weather Settings</h2>
+                </div>
+            </div>
+        </main>
+        <nav>
+            <ul>
+                <li><a href="explore.html" data-i18n="explore">Explore</a></li>
+                <li><a href="index.html" class="active" data-i18n="home">Home</a></li>
+                <li><a href="profile.html" data-i18n="profile">Profile</a></li>
+            </ul>
+        </nav>
+    </div>
+    <script src="i18n.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

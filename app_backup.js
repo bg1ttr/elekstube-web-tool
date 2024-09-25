@@ -1,3 +1,4 @@
+// 备份Wi-Fi配置功能正常部分代码
 let bluetoothDevice;
 let gattServer;
 let wifiCharacteristic;
@@ -13,25 +14,25 @@ const COMMANDS = {
     GET_WIFI_STATE: '#17',
     SET_WIFI: '#18',
     GET_WIFI_CONFIG: '#19',
+    SET_TIME: '#20',
 };
 
 function customEncode(str) {
-    return btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, function(match, p1) {
-        return String.fromCharCode('0x' + p1);
-    })).replace(/\+/g, '.').replace(/=/g, '-').replace(/\//g, '_');
+    return btoa(str);
 }
 
 function customDecode(str) {
-    return decodeURIComponent(atob(str.replace(/\./g, '+').replace(/-/g, '=').replace(/_/g, '/')).split('').map(function(c) {
-        return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-    }).join(''));
+    return atob(str);
 }
 
 function log(message) {
     console.log(message);
-    const statusDiv = document.getElementById('status');
-    statusDiv.textContent += message + '\n';
-    statusDiv.scrollTop = statusDiv.scrollHeight;
+    const logContent = document.getElementById('log-content');
+    if (logContent) {
+        const timestamp = new Date().toLocaleTimeString();
+        logContent.textContent += `[${timestamp}] ${message}\n`;
+        logContent.scrollTop = logContent.scrollHeight;
+    }
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -40,16 +41,33 @@ document.addEventListener('DOMContentLoaded', () => {
     const wifiForm = document.getElementById('wifi-form');
     const connectionStatus = document.getElementById('connection-status');
     const wifiStatus = document.getElementById('wifi-status');
-    const readWifiConfigButton = document.getElementById('read-wifi-config');
+    const syncTimeButton = document.getElementById('sync-time-button');
 
-    scanButton.addEventListener('click', scanForDevices);
+    if (scanButton) {
+        log('找到扫描按钮，添加事件监听器');
+        scanButton.addEventListener('click', scanForDevices);
+    } else {
+        log('错误：未找到扫描按钮');
+    }
+
     resetButton.addEventListener('click', resetApp);
     wifiForm.addEventListener('submit', configureWiFi);
-    readWifiConfigButton.addEventListener('click', readWiFiConfig);
+    syncTimeButton.addEventListener('click', syncTime);
+
+    function onDisconnected(event) {
+        const device = event.target;
+        log(`设备 ${device.name} 已断开连接`);
+        connectionStatus.textContent = '已断开连接';
+        document.getElementById('wifi-section').style.display = 'none';
+    }
 
     async function scanForDevices() {
+        log('扫描函数被调用');
         try {
             log('开始扫描设备...');
+            if (!navigator.bluetooth) {
+                throw new Error('浏览器不支持 Web Bluetooth API');
+            }
             const device = await navigator.bluetooth.requestDevice({
                 filters: [{ namePrefix: 'EleksIPS' }],
                 optionalServices: ['4fafc201-1fb5-459e-8fcc-c5c9c331914b']
@@ -58,7 +76,13 @@ document.addEventListener('DOMContentLoaded', () => {
             log('尝试连接到设备...');
             await connectToDevice(device);
         } catch (error) {
-            log(`扫描设备错误: ${error.message || error}`);
+            if (error.name === 'NotFoundError') {
+                log('未找到匹配的蓝牙设备');
+            } else if (error.name === 'SecurityError') {
+                log('用户拒绝了蓝牙权限请求');
+            } else {
+                log(`扫描设备错误: ${error.name} - ${error.message}`);
+            }
             handleError(error);
         }
     }
@@ -87,8 +111,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
             connectionStatus.textContent = `已连接到 ${device.name}`;
             document.getElementById('wifi-section').style.display = 'block';
+            log(`成功连接到设备 ${device.name}`);
             log('执行握手...');
             await performHandshake();
+            log('握手完成');
         } catch (error) {
             log(`连接错误: ${error.message || error}`);
             handleError(error);
@@ -100,15 +126,23 @@ document.addEventListener('DOMContentLoaded', () => {
         log(`收到原始数据: ${value}`);
         receivedData += value;
         
+        log(`当前累积数据: ${receivedData}`);
+        
         if (receivedData.includes('\n') || receivedData.length > 20) {
             log(`处理完整响应: ${receivedData}`);
             parseDeviceResponse(receivedData);
             receivedData = '';
         }
     }
-    
+
     function parseDeviceResponse(response) {
+        log(`开始解析响应: ${response}`);
         const commands = response.split('#').filter(cmd => cmd.trim().length > 0);
+        
+        if (commands.length === 0) {
+            log('没有找到有效的命令');
+            return;
+        }
         
         commands.forEach(cmd => {
             const parts = cmd.trim().split(' ');
@@ -129,12 +163,41 @@ document.addEventListener('DOMContentLoaded', () => {
                 case '19':
                     handleWiFiConfigInfoResponse(parts);
                     break;
+                case '20':
+                    handleTimeSetResponse(parts);
+                    break;
+                case '4':
+                    log(`收到时间同步响应: ${parts.slice(1).join(' ')}`);
+                    // 可以在这里添加更多的处理逻辑
+                    break;
                 default:
                     log(`未知响应: #${cmd}`);
             }
         });
     }
-    
+
+    function handleWiFiConfigResponse(parts) {
+        if (parts.length >= 3) {
+            const ssid = customDecode(parts[1]);
+            const password = parts[2]; // 密码可能是明文
+            log(`Wi-Fi 配置已接收: SSID=${ssid}, Password=****`);
+            wifiStatus.textContent = 'Wi-Fi 配置已发送，等待连接结果';
+        } else {
+            log('收到的Wi-Fi配置响应格式不正确');
+            wifiStatus.textContent = 'Wi-Fi 配置响应异常';
+        }
+    }
+
+    function handleWiFiStatusResponse(parts) {
+        const status = parts[1] === '1' ? '已连接' : '未连接';
+        let ip = 'Unknown';
+        if (parts.length > 2) {
+            ip = parts[2];
+        }
+        log(`Wi-Fi 状态: ${status}, IP: ${ip}`);
+        wifiStatus.textContent = `Wi-Fi: ${status}, IP: ${ip}`;
+    }
+
     function handleWiFiConfigInfoResponse(parts) {
         if (parts.length < 3) {
             log('收到的Wi-Fi配置信息不完整');
@@ -150,81 +213,59 @@ document.addEventListener('DOMContentLoaded', () => {
         log(`SSID: ${ssid}`);
         log(`Password: ${'*'.repeat(password.length)}`);
     }
-    
-    function handleWiFiStatusResponse(parts) {
-        const status = parts[1] === '1' ? '已连接' : '未连接';
-        let ip = 'Unknown';
-        if (parts.length > 3) {
-            ip = parts.slice(3).join(':');
-        }
-        log(`Wi-Fi状态: ${status}, IP: ${ip}`);
-        wifiStatus.textContent = `Wi-Fi状态: ${status}, IP: ${ip}`;
-    }
 
-    function handleWiFiConfigResponse(parts) {
-        if (parts[1] === '0') {
-            log('Wi-Fi配置成功接收');
+    function handleTimeSetResponse(parts) {
+        if (parts[1] === '1') {
+            log('时间同步成功');
         } else {
-            log('Wi-Fi配置接收失败');
+            log('时间同步失败');
         }
-    }
-
-    function onDisconnected() {
-        log('设备已断开连接');
-        reconnectDevice();
     }
 
     async function configureWiFi(event) {
         event.preventDefault();
-        const ssid = document.getElementById('ssid').value.trim();
-        const password = document.getElementById('password').value.trim();
-    
-        if (!checkBluetoothConnection()) {
-            return;
-        }
-    
+        const ssid = document.getElementById('ssid').value;
+        const password = document.getElementById('password').value;
+        
         try {
-            const encodedSsid = customEncode(ssid);
-            const encodedPassword = customEncode(password);
-    
-            const command = `${COMMANDS.SET_WIFI} ${encodedSsid} ${encodedPassword}`;
-            log(`发送Wi-Fi配置命令: ${command}`);
-            await sendCommandWithTimeout(command, 15000);
-            log('Wi-Fi配置命令已发送');
-    
-            log('等待设备处理配置...');
-            await new Promise(resolve => setTimeout(resolve, 10000));
-    
-            await queryWiFiStatus();
+            log('开始配置 Wi-Fi...');
+            await sendWiFiConfig(ssid, password);
+            log('Wi-Fi 配置命令已发送');
+            
+            // 等待较长时间后检查 Wi-Fi 状态
+            log('等待设备连接Wi-Fi...');
+            await new Promise(resolve => setTimeout(resolve, 20000)); // 等待20秒
+            log('正在检查 Wi-Fi 状态...');
+            await sendBLEData(COMMANDS.GET_WIFI_STATE);
         } catch (error) {
-            log(`Wi-Fi配置错误: ${error.message || error}`);
+            log(`Wi-Fi 配置错误: ${error.message || error}`);
             handleError(error);
         }
     }
 
-    async function queryWiFiStatus() {
-        try {
-            log('查询Wi-Fi状态...');
-            await sendCommandWithTimeout(COMMANDS.GET_WIFI_STATE, 5000);
-            log('Wi-Fi状态查询命令已发送');
-        } catch (error) {
-            log(`查询Wi-Fi状态失败: ${error.message || error}`);
-            handleError(error);
-        }
+    async function sendWiFiConfig(ssid, password) {
+        const encodedSsid = customEncode(ssid);
+        const encodedPassword = password; // 密码似乎没有被编码
+        const command = `${COMMANDS.SET_WIFI} ${encodedSsid} ${encodedPassword}\n`;
+        
+        log(`准备发送Wi-Fi配置: SSID=${ssid}, Password=****`);
+        await sendBLEData(command);
+        log('Wi-Fi配置数据已发送');
     }
 
     async function sendBLEData(data) {
         try {
             const encoder = new TextEncoder();
             const dataArray = encoder.encode(data);
+            const chunkSize = 20; // 蓝牙数据包通常限制为20字节
             
-            log(`准备发送数据: ${data}`);
-            for (let i = 0; i < dataArray.length; i += 1) {
-                const chunk = dataArray.slice(i, i + 1);
-                log(`发送数据字节: ${chunk[0]}`);
+            for (let i = 0; i < dataArray.length; i += chunkSize) {
+                const chunk = dataArray.slice(i, i + chunkSize);
                 await wifiCharacteristic.writeValue(chunk);
-                await new Promise(resolve => setTimeout(resolve, 100));
+                log(`发送数据块: ${i/chunkSize + 1}`);
+                await new Promise(resolve => setTimeout(resolve, 100)); // 短暂延迟，避免发送过快
             }
+            
             log(`数据发送完成: ${data}`);
         } catch (error) {
             log(`发送数据失败: ${error.message || error}`);
@@ -232,51 +273,14 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    async function sendCommandWithTimeout(command, timeout = 5000) {
-        return new Promise(async (resolve, reject) => {
-            const timeoutId = setTimeout(() => {
-                reject(new Error('命令执行超时'));
-            }, timeout);
-
-            try {
-                await sendBLEData(command);
-                clearTimeout(timeoutId);
-                resolve();
-            } catch (error) {
-                clearTimeout(timeoutId);
-                reject(error);
-            }
-        });
-    }
-
-    async function queueOperation(operation) {
-        return new Promise((resolve, reject) => {
-            operationQueue.push({ operation, resolve, reject });
-            processQueue();
-        });
-    }
-
-    async function processQueue() {
-        if (isProcessingQueue || operationQueue.length === 0) return;
-        isProcessingQueue = true;
-        const { operation, resolve, reject } = operationQueue.shift();
-        try {
-            const result = await operation();
-            resolve(result);
-        } catch (error) {
-            reject(error);
-        } finally {
-            isProcessingQueue = false;
-            setTimeout(processQueue, 100);
-        }
-    }
-
     async function performHandshake() {
         try {
             const command = COMMANDS.SYS_HANDSHAKE;
             log(`发送握手命令: ${command}`);
-            await sendCommandWithTimeout(command, 5000);
+            await sendCommandWithTimeout(command, 10000);
             log('握手命令已发送，等待响应...');
+            await new Promise(resolve => setTimeout(resolve, 5000));
+            log('握手等待结束');
         } catch (error) {
             log(`握手失败: ${error.message || error}`);
             handleError(error);
@@ -295,15 +299,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function resetApp() {
         log('重置应用...');
-        if (bluetoothDevice && bluetoothDevice.gatt.connected) {
-            bluetoothDevice.gatt.disconnect();
+        if (bluetoothDevice) {
+            if (bluetoothDevice.gatt.connected) {
+                bluetoothDevice.gatt.disconnect();
+            }
+            bluetoothDevice.removeEventListener('gattserverdisconnected', onDisconnected);
+            bluetoothDevice = null;
         }
-        bluetoothDevice = null;
         gattServer = null;
         wifiCharacteristic = null;
         connectionStatus.textContent = '';
         wifiStatus.textContent = '';
-        document.getElementById('status').textContent = '';
+        document.getElementById('log-content').textContent = '';  // 清空日志窗口
         document.getElementById('wifi-section').style.display = 'none';
         retryCount = 0;
         receivedData = '';
@@ -315,20 +322,40 @@ document.addEventListener('DOMContentLoaded', () => {
     function handleError(error) {
         console.error('Error:', error);
         log(`错误: ${error.message || error}`);
-        // 可能的话，尝试重新连接或重置状态
     }
 
-    async function readWiFiConfig() {
+    async function syncTime() {
         try {
-            log('正在读取系统信息...');
+            log('开始同步时间...');
             if (!checkBluetoothConnection()) {
                 throw new Error('蓝牙设备未连接');
             }
-            await prepareDevice();
-            await sendCommandWithTimeout(COMMANDS.GET_SYS_INFO, 10000);
-            log('系统信息查询命令已发送，等待响应...');
+            
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = (now.getMonth() + 1).toString().padStart(2, '0');
+            const day = now.getDate().toString().padStart(2, '0');
+            const hours = now.getHours().toString().padStart(2, '0');
+            const minutes = now.getMinutes().toString().padStart(2, '0');
+            const seconds = now.getSeconds().toString().padStart(2, '0');
+    
+            // 尝试多种格式
+            const formats = [
+                `#4 0 ${year}-${month}-${day} ${hours}:${minutes}:${seconds}\n`,
+                `#4 0 ${year}${month}${day}${hours}${minutes}${seconds}\n`,
+                `#4 0 ${Math.floor(now.getTime() / 1000)}\n`, // Unix timestamp
+                `#4 0 ${year} ${month} ${day} ${hours} ${minutes} ${seconds}\n`
+            ];
+    
+            for (const command of formats) {
+                log(`准备发送时间同步命令: ${command}`);
+                await sendCommandWithTimeout(command, 5000);
+                log('时间同步命令已发送，等待响应...');
+                await new Promise(resolve => setTimeout(resolve, 2000)); // 等待2秒
+            }
+    
         } catch (error) {
-            log(`读取系统信息失败: ${error.message || error}`);
+            log(`同步时间失败: ${error.message || error}`);
             handleError(error);
         }
     }
@@ -341,28 +368,20 @@ document.addEventListener('DOMContentLoaded', () => {
         return true;
     }
 
-    async function reconnectDevice() {
-        log('尝试重新连接设备...');
-        try {
-            if (bluetoothDevice) {
-                await connectToDevice(bluetoothDevice);
-            } else {
-                log('没有可重连的设备');
-            }
-        } catch (error) {
-            log(`重连失败: ${error.message || error}`);
-            handleError(error);
-        }
-    }
+    async function sendCommandWithTimeout(command, timeout = 5000) {
+        return new Promise(async (resolve, reject) => {
+            const timeoutId = setTimeout(() => {
+                reject(new Error('命令执行超时'));
+            }, timeout);
 
-    async function prepareDevice() {
-        try {
-            log('准备设备...');
-            await sendBLEData('#');  // 发送一个空命令
-            await new Promise(resolve => setTimeout(resolve, 500));  // 等待500ms
-        } catch (error) {
-            log(`准备设备失败: ${error.message || error}`);
-            throw error;
-        }
+            try {
+                await sendBLEData(command);
+                clearTimeout(timeoutId);
+                resolve();
+            } catch (error) {
+                clearTimeout(timeoutId);
+                reject(error);
+            }
+        });
     }
 });

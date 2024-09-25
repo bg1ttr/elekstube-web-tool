@@ -10,10 +10,40 @@ let isProcessingQueue = false;
 const COMMANDS = {
     SYS_HANDSHAKE: '#0',
     GET_SYS_INFO: '#1',
+    SET_SYS_POWER: '#2',
+    SET_SYS_RESTART: '#3',
+    SET_TIME: '#4',
+    SET_TIME_FORMAT: '#5',
+    SET_TIME_ZONE: '#6',
+    SET_TFT_STYLE: '#7',
+    SET_TFT_MODE: '#8',
+    SET_TFT_ROTATE: '#9',
+    SET_TFT_POWER: '#10',
+    SET_LED_POWER: '#11',
+    SET_LED_STYLE: '#12',
+    SET_LED_BRIGHTNESS: '#13',
+    SET_LED_COLOR: '#14',
+    SET_LED_COLORS: '#15',
+    GET_WIFI_LIST: '#16',
     GET_WIFI_STATE: '#17',
     SET_WIFI: '#18',
-    GET_WIFI_CONFIG: '#19',
-    SET_TIME: '#20',
+    FS_FORMAT: '#19',
+    FS_DOWNLOAD_FILE: '#20',
+    FS_DOWNLOAD_ALBUM: '#21',
+    SET_NTP_SERVER: '#22',
+    SET_NTP_INTERVAL: '#23',
+    SYS_UPDATA_FFS: '#24',
+    SET_SPECIAL_STATE: '#25',
+    GET_SPECIAL_STATE: '#26',
+    SET_SPECIAL_INFO: '#27',
+    SET_CITY_CODE: '#28',
+    SET_BILIBILI_ID: '#29',
+    SET_TIKTOK_ID: '#30',
+    SET_YOUTUB_ID: '#31',
+    GET_UID: '#222',
+    SET_TOKEN: '#233',
+    TEST_TOKEN: '#234',
+    DEL_TOKEN: '#235'
 };
 
 function customEncode(str) {
@@ -151,20 +181,45 @@ document.addEventListener('DOMContentLoaded', () => {
                     log('收到握手响应');
                     break;
                 case '1':
-                    log(`收到系统信息: ${parts.slice(1).join(' ')}`);
+                    // 处理系统信息
+                    let sysInfo = parts.slice(1).join(' ');
+                    try {
+                        sysInfo = JSON.parse(sysInfo);
+                        log(`解析的系统信息: ${JSON.stringify(sysInfo)}`);
+                        // 这里可以添加对系统时间的解析和验证
+                    } catch (error) {
+                        log(`系统信息解析失败: ${error.message}`);
+                    }
                     break;
-                case '18':
-                    handleWiFiConfigResponse(parts);
+                case '4':
+                    log(`收到时间同步响应: ${parts.slice(1).join(' ')}`);
+                    if (parts[1] === '0') {
+                        const syncedTime = parts.slice(2).join(' ');
+                        log(`时间同步响应，设备时间: ${syncedTime}`);
+                    } else {
+                        log('时间同步失败');
+                    }
+                    break;
+                case '6':
+                    log(`收到时区设置响应: ${parts.slice(1).join(' ')}`);
                     break;
                 case '17':
-                    handleWiFiStatusResponse(parts);
+                    log(`收到Wi-Fi状态响应: ${parts.slice(1).join(' ')}`);
+                    if (parts[1] === '0' && parts[2] === '1') {
+                        log('Wi-Fi 连接成功');
+                    } else {
+                        log('Wi-Fi 连接失败或状态未知');
+                    }
                     break;
-                case '19':
-                    handleWiFiConfigInfoResponse(parts);
+                case '18':
+                    log(`收到Wi-Fi配置响应: ${parts.slice(1).join(' ')}`);
+                    if (parts[1] === '0') {
+                        log('Wi-Fi 配置成功接收');
+                    } else {
+                        log('Wi-Fi 配置接收失败');
+                    }
                     break;
-                case '20':
-                    handleTimeSetResponse(parts);
-                    break;
+                // ... 其他 case 语句 ...
                 default:
                     log(`未知响应: #${cmd}`);
             }
@@ -172,66 +227,49 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function handleWiFiConfigResponse(parts) {
-        if (parts.length >= 3) {
-            const ssid = customDecode(parts[1]);
-            const password = parts[2]; // 密码可能是明文
-            log(`Wi-Fi 配置已接收: SSID=${ssid}, Password=****`);
-            wifiStatus.textContent = 'Wi-Fi 配置已发送，等待连接结果';
+        if (parts[1] === '0') {
+            log('Wi-Fi 配置成功');
+            wifiStatus.textContent = '已配置';
         } else {
-            log('收到的Wi-Fi配置响应格式不正确');
-            wifiStatus.textContent = 'Wi-Fi 配置响应异常';
+            log('Wi-Fi 配置失败');
+            wifiStatus.textContent = '配置失败';
+            retryWiFiConfig();
         }
     }
 
-    function handleWiFiStatusResponse(parts) {
-        const status = parts[1] === '1' ? '已连接' : '未连接';
-        let ip = 'Unknown';
-        if (parts.length > 2) {
-            ip = parts[2];
-        }
-        log(`Wi-Fi 状态: ${status}, IP: ${ip}`);
-        wifiStatus.textContent = `Wi-Fi: ${status}, IP: ${ip}`;
-    }
-
-    function handleWiFiConfigInfoResponse(parts) {
-        if (parts.length < 3) {
-            log('收到的Wi-Fi配置信息不完整');
-            return;
-        }
-        const encodedSsid = parts[1];
-        const encodedPassword = parts[2];
-        
-        const ssid = customDecode(encodedSsid);
-        const password = customDecode(encodedPassword);
-        
-        log(`保存的Wi-Fi配置:`);
-        log(`SSID: ${ssid}`);
-        log(`Password: ${'*'.repeat(password.length)}`);
-    }
-
-    function handleTimeSetResponse(parts) {
-        if (parts[1] === '1') {
-            log('时间同步成功');
+    function handleWiFiStateResponse(parts) {
+        if (parts[1] === '0') {
+            log('Wi-Fi 已连接');
+            wifiStatus.textContent = '已连接';
         } else {
-            log('时间同步失败');
+            log('Wi-Fi 未连接');
+            wifiStatus.textContent = '未连接';
         }
     }
 
     async function configureWiFi(event) {
         event.preventDefault();
+        log('开始配置 Wi-Fi...');
         const ssid = document.getElementById('ssid').value;
         const password = document.getElementById('password').value;
         
+        if (!ssid || !password) {
+            log('请输入 SSID 和密码');
+            return;
+        }
+
         try {
-            log('开始配置 Wi-Fi...');
             await sendWiFiConfig(ssid, password);
-            log('Wi-Fi 配置命令已发送');
+            log('Wi-Fi 配置已发送');
             
-            // 等待较长时间后检查 Wi-Fi 状态
-            log('等待设备连接Wi-Fi...');
-            await new Promise(resolve => setTimeout(resolve, 20000)); // 等待20秒
-            log('正在检查 Wi-Fi 状态...');
-            await sendBLEData(COMMANDS.GET_WIFI_STATE);
+            // 等待一段时间后检查 Wi-Fi 状态
+            await new Promise(resolve => setTimeout(resolve, 10000));
+            log('检查 Wi-Fi 状态...');
+            await sendCommandWithTimeout(COMMANDS.GET_WIFI_STATE + '\n', 5000);
+
+            log('Wi-Fi 配置已完成。请手动重启设备以使新的 Wi-Fi 设置生效。');
+            alert('Wi-Fi 配置已完成。请手动重启设备以使新的 Wi-Fi 设置生效。');
+
         } catch (error) {
             log(`Wi-Fi 配置错误: ${error.message || error}`);
             handleError(error);
@@ -270,7 +308,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function performHandshake() {
         try {
-            const command = COMMANDS.SYS_HANDSHAKE;
+            const command = COMMANDS.SYS_HANDSHAKE + '\n';
             log(`发送握手命令: ${command}`);
             await sendCommandWithTimeout(command, 10000);
             log('握手命令已发送，等待响应...');
@@ -328,16 +366,47 @@ document.addEventListener('DOMContentLoaded', () => {
             
             const now = new Date();
             const year = now.getFullYear();
-            const month = now.getMonth() + 1; // getMonth() 返回 0-11
-            const day = now.getDate();
-            const hours = now.getHours();
-            const minutes = now.getMinutes();
-            const seconds = now.getSeconds();
-
-            const command = `${COMMANDS.SET_TIME} ${year} ${month} ${day} ${hours} ${minutes} ${seconds}\n`;
-            
-            await sendCommandWithTimeout(command, 5000);
+            const month = (now.getMonth() + 1).toString().padStart(2, '0');
+            const day = now.getDate().toString().padStart(2, '0');
+            const hours = now.getHours().toString().padStart(2, '0');
+            const minutes = now.getMinutes().toString().padStart(2, '0');
+            const seconds = now.getSeconds().toString().padStart(2, '0');
+    
+            // 设置时间
+            const setTimeCommand = `${COMMANDS.SET_TIME} 0 ${year}-${month}-${day} ${hours}:${minutes}:${seconds}\n`;
+            log(`准备发送时间同步命令: ${setTimeCommand}`);
+            await sendCommandWithTimeout(setTimeCommand, 5000);
             log('时间同步命令已发送，等待响应...');
+            
+            // 等待并验证时间同步响应
+            const timeResponse = await waitForResponse('#4', 10000);
+            const syncedTime = parseTimeResponse(timeResponse);
+            if (!isTimeValid(syncedTime, now)) {
+                log(`警告：设备返回的时间不正确: ${syncedTime}`);
+                // 尝试重新同步时间
+                await retryTimeSync(3);
+            } else {
+                log(`时间同步成功，设备时间: ${syncedTime}`);
+            }
+
+            // 设置时区
+            const timezoneOffset = -now.getTimezoneOffset();
+            const timezoneHours = Math.floor(Math.abs(timezoneOffset) / 60);
+            const timezoneMinutes = Math.abs(timezoneOffset) % 60;
+            const timezoneString = `${timezoneOffset >= 0 ? '+' : '-'}${timezoneHours.toString().padStart(2, '0')}:${timezoneMinutes.toString().padStart(2, '0')}`;
+            
+            const setTimezoneCommand = `${COMMANDS.SET_TIME_ZONE} ${timezoneString}\n`;
+            log(`准备发送时区设置命令: ${setTimezoneCommand}`);
+            await sendCommandWithTimeout(setTimezoneCommand, 5000);
+            log('时区设置命令已发送，等待响应...');
+            await new Promise(resolve => setTimeout(resolve, 2000)); // 等待2秒
+    
+            // 再次检查时间，确保设置成功
+            const checkTimeCommand = `${COMMANDS.GET_SYS_INFO}\n`;
+            log(`准备发送时间检查命令: ${checkTimeCommand}`);
+            await sendCommandWithTimeout(checkTimeCommand, 5000);
+            log('时间检查命令已发送，等待响应...');
+
         } catch (error) {
             log(`同步时间失败: ${error.message || error}`);
             handleError(error);
@@ -359,6 +428,9 @@ document.addEventListener('DOMContentLoaded', () => {
             }, timeout);
 
             try {
+                if (!checkBluetoothConnection()) {
+                    throw new Error('蓝牙设备未连接');
+                }
                 await sendBLEData(command);
                 clearTimeout(timeoutId);
                 resolve();
@@ -367,5 +439,58 @@ document.addEventListener('DOMContentLoaded', () => {
                 reject(error);
             }
         });
+    }
+
+    function parseTimeResponse(response) {
+        const parts = response.split(' ');
+        if (parts.length >= 4) {
+            return `${parts[2]} ${parts[3]}`;
+        }
+        throw new Error('无效的时间响应格式');
+    }
+
+    function isTimeValid(syncedTime, referenceTime) {
+        const synced = new Date(syncedTime);
+        const reference = new Date(referenceTime);
+        const diff = Math.abs(synced - reference);
+        return diff < 60000; // 允许1分钟的误差
+    }
+
+    function waitForResponse(expectedCommand, timeout = 5000) {
+        return new Promise((resolve, reject) => {
+            const timeoutId = setTimeout(() => {
+                reject(new Error(`等待响应超时: ${expectedCommand}`));
+            }, timeout);
+
+            const responseHandler = (event) => {
+                const response = event.target.value.getUint8Array();
+                const responseText = new TextDecoder().decode(response);
+                if (responseText.startsWith(expectedCommand)) {
+                    clearTimeout(timeoutId);
+                    wifiCharacteristic.removeEventListener('characteristicvaluechanged', responseHandler);
+                    resolve(responseText);
+                }
+            };
+
+            wifiCharacteristic.addEventListener('characteristicvaluechanged', responseHandler);
+        });
+    }
+
+    async function retryTimeSync(maxRetries) {
+        for (let i = 0; i < maxRetries; i++) {
+            log(`尝试重新同步时间，第 ${i + 1} 次...`);
+            const now = new Date();
+            const setTimeCommand = `${COMMANDS.SET_TIME} 0 ${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')} ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}\n`;
+            
+            await sendCommandWithTimeout(setTimeCommand, 5000);
+            const timeResponse = await waitForResponse('#4', 10000);
+            const syncedTime = parseTimeResponse(timeResponse);
+            
+            if (isTimeValid(syncedTime, now)) {
+                log(`重新同步成功，设备时间: ${syncedTime}`);
+                return;
+            }
+        }
+        throw new Error(`时间同步失败，已尝试 ${maxRetries} 次`);
     }
 });

@@ -77,13 +77,10 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!navigator.bluetooth) {
                 throw new Error('浏览器不支持 Web Bluetooth API');
             }
-            const device = await Promise.race([
-                navigator.bluetooth.requestDevice({
-                    filters: [{ namePrefix: 'EleksIPS' }],
-                    optionalServices: ['4fafc201-1fb5-459e-8fcc-c5c9c331914b']
-                }),
-                new Promise((_, reject) => setTimeout(() => reject(new Error('扫描超时')), 30000))
-            ]);
+            const device = await navigator.bluetooth.requestDevice({
+                filters: [{ namePrefix: 'EleksIPS' }],
+                optionalServices: ['4fafc201-1fb5-459e-8fcc-c5c9c331914b']
+            });
             log(`找到设备: ${device.name}`);
             log('尝试连接到设备...');
             await connectToDevice(device);
@@ -106,48 +103,38 @@ document.addEventListener('DOMContentLoaded', () => {
             
             gattServer = await device.gatt.connect();
             log('GATT服务器已连接');
-
+    
             device.addEventListener('gattserverdisconnected', onDisconnected);
-
-            await connectToGATTServer(device);
-        } catch (error) {
-            log(`连接错误: ${error.message || error}`);
-            handleError(error);
-            await handleReconnect(device);
-        }
-    }
-
-    async function connectToGATTServer(device) {
-        try {
+    
             log('尝试获取服务...');
             const service = await gattServer.getPrimaryService('4fafc201-1fb5-459e-8fcc-c5c9c331914b');
             log(`找到服务: ${service.uuid}`);
-
+    
             log('尝试获取特征...');
             wifiCharacteristic = await service.getCharacteristic('beb5483e-36e1-4688-b7f5-ea07361b26a8');
             log(`找到可写入的特征: ${wifiCharacteristic.uuid}`);
-
+    
             log('开始监听特征值变化...');
             await wifiCharacteristic.startNotifications();
             wifiCharacteristic.addEventListener('characteristicvaluechanged', handleCharacteristicValueChanged);
-
+    
             connectionStatus.textContent = `已连接到 ${device.name}`;
             document.getElementById('wifi-section').style.display = 'block';
             log(`成功连接到设备 ${device.name}`);
-
-            reconnectAttempts = 0; // 重置重连尝试次数
-
-            await enqueueGattOperation(performHandshake);
-            await enqueueGattOperation(getDeviceInfo);
-            await enqueueGattOperation(syncTime);
+    
+            await performHandshake();
+            await getDeviceInfo();
+            // 移除了 syncTime 的调用
         } catch (error) {
-            throw error; // 将错误抛出，由上层函数处理
+            log(`连接错误: ${error.message || error}`);
+            handleError(error);
         }
     }
 
     function handleCharacteristicValueChanged(event) {
         const value = new TextDecoder().decode(event.target.value);
-        log(`收到原始数据: ${value}`);
+        const sanitizedValue = sanitizeLogMessage(value);
+        log(`收到原始数据: ${sanitizedValue}`);
         receivedData += value;
         
         log(`当前累积数据: ${receivedData}`);
@@ -159,8 +146,14 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    function sanitizeLogMessage(message) {
+        // 使用正则表达式替换可能的密码
+        return message.replace(/(\d{11,})/g, '****');
+    }
+
     function parseDeviceResponse(response) {
-        log(`开始解析响应: ${response}`);
+        const sanitizedResponse = sanitizeLogMessage(response);
+        log(`开始解析响应: ${sanitizedResponse}`);
         if (response.startsWith('#1')) {
             // 解析设备信息
             try {
@@ -223,7 +216,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function sendWiFiConfig(ssid, password) {
         const encodedSsid = customEncode(ssid);
-        const encodedPassword = password; // 密码似乎没有被编码
+        const encodedPassword = customEncode(password);
         const command = `${COMMANDS.SET_WIFI} ${encodedSsid} ${encodedPassword}\n`;
         
         log(`准备发送Wi-Fi配置: SSID=${ssid}, Password=****`);

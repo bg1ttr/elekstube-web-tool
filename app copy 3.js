@@ -13,15 +13,19 @@ const COMMANDS = {
     GET_WIFI_STATE: '#17',
     SET_WIFI: '#18',
     GET_WIFI_CONFIG: '#19',
-    SET_TIME: '#20',
+    SET_TIME: '#20',  // 新增的设置时间命令
 };
 
 function customEncode(str) {
-    return btoa(str);
+    return btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, function(match, p1) {
+        return String.fromCharCode('0x' + p1);
+    })).replace(/\+/g, '.').replace(/=/g, '-').replace(/\//g, '_');
 }
 
 function customDecode(str) {
-    return atob(str);
+    return decodeURIComponent(atob(str.replace(/\./g, '+').replace(/-/g, '=').replace(/_/g, '/')).split('').map(function(c) {
+        return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+    }).join(''));
 }
 
 function log(message) {
@@ -172,14 +176,13 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function handleWiFiConfigResponse(parts) {
-        if (parts.length >= 3) {
-            const ssid = customDecode(parts[1]);
-            const password = parts[2]; // 密码可能是明文
-            log(`Wi-Fi 配置已接收: SSID=${ssid}, Password=****`);
-            wifiStatus.textContent = 'Wi-Fi 配置已发送，等待连接结果';
+        if (parts[1] === '1') {
+            log('Wi-Fi 配置成功');
+            wifiStatus.textContent = 'Wi-Fi 配置成功';
         } else {
-            log('收到的Wi-Fi配置响应格式不正确');
-            wifiStatus.textContent = 'Wi-Fi 配置响应异常';
+            log('Wi-Fi 配置失败');
+            wifiStatus.textContent = 'Wi-Fi 配置失败';
+            retryWiFiConfig();
         }
     }
 
@@ -227,9 +230,8 @@ document.addEventListener('DOMContentLoaded', () => {
             await sendWiFiConfig(ssid, password);
             log('Wi-Fi 配置命令已发送');
             
-            // 等待较长时间后检查 Wi-Fi 状态
-            log('等待设备连接Wi-Fi...');
-            await new Promise(resolve => setTimeout(resolve, 20000)); // 等待20秒
+            // 等待一段时间后检查 Wi-Fi 状态
+            await new Promise(resolve => setTimeout(resolve, 5000));
             log('正在检查 Wi-Fi 状态...');
             await sendBLEData(COMMANDS.GET_WIFI_STATE);
         } catch (error) {
@@ -240,7 +242,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function sendWiFiConfig(ssid, password) {
         const encodedSsid = customEncode(ssid);
-        const encodedPassword = password; // 密码似乎没有被编码
+        const encodedPassword = customEncode(password);
         const command = `${COMMANDS.SET_WIFI} ${encodedSsid} ${encodedPassword}\n`;
         
         log(`准备发送Wi-Fi配置: SSID=${ssid}, Password=****`);
@@ -252,15 +254,9 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const encoder = new TextEncoder();
             const dataArray = encoder.encode(data);
-            const chunkSize = 20; // 蓝牙数据包通常限制为20字节
             
-            for (let i = 0; i < dataArray.length; i += chunkSize) {
-                const chunk = dataArray.slice(i, i + chunkSize);
-                await wifiCharacteristic.writeValue(chunk);
-                log(`发送数据块: ${i/chunkSize + 1}`);
-                await new Promise(resolve => setTimeout(resolve, 100)); // 短暂延迟，避免发送过快
-            }
-            
+            log(`准备发送数据: ${data}`);
+            await wifiCharacteristic.writeValue(dataArray);
             log(`数据发送完成: ${data}`);
         } catch (error) {
             log(`发送数据失败: ${error.message || error}`);

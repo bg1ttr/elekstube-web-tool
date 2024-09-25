@@ -71,6 +71,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const connectionStatus = document.getElementById('connection-status');
     const wifiStatus = document.getElementById('wifi-status');
     const syncTimeButton = document.getElementById('sync-time-button');
+    const syncTimezoneButton = document.getElementById('sync-timezone-button');
+    syncTimezoneButton.addEventListener('click', syncTimezone);
 
     if (scanButton) {
         log('找到扫描按钮，添加事件监听器');
@@ -391,11 +393,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // 设置时区
             const timezoneOffset = -now.getTimezoneOffset();
-            const timezoneHours = Math.floor(Math.abs(timezoneOffset) / 60);
-            const timezoneMinutes = Math.abs(timezoneOffset) % 60;
-            const timezoneString = `${timezoneOffset >= 0 ? '+' : '-'}${timezoneHours.toString().padStart(2, '0')}:${timezoneMinutes.toString().padStart(2, '0')}`;
-            
-            const setTimezoneCommand = `${COMMANDS.SET_TIME_ZONE} ${timezoneString}\n`;
+            const setTimezoneCommand = `${COMMANDS.SET_TIME_ZONE} ${timezoneOffset}\n`;
             log(`准备发送时区设置命令: ${setTimezoneCommand}`);
             await sendCommandWithTimeout(setTimezoneCommand, 5000);
             log('时区设置命令已发送，等待响应...');
@@ -456,22 +454,34 @@ document.addEventListener('DOMContentLoaded', () => {
         return diff < 60000; // 允许1分钟的误差
     }
 
-    function waitForResponse(expectedCommand, timeout = 5000) {
+    function waitForResponse(expectedCommand, timeout = 15000) {
         return new Promise((resolve, reject) => {
             const timeoutId = setTimeout(() => {
                 reject(new Error(`等待响应超时: ${expectedCommand}`));
             }, timeout);
-
+    
+            let accumulatedResponse = '';
+    
             const responseHandler = (event) => {
-                const response = event.target.value.getUint8Array();
-                const responseText = new TextDecoder().decode(response);
-                if (responseText.startsWith(expectedCommand)) {
-                    clearTimeout(timeoutId);
-                    wifiCharacteristic.removeEventListener('characteristicvaluechanged', responseHandler);
-                    resolve(responseText);
+                const response = new TextDecoder().decode(event.target.value);
+                accumulatedResponse += response;
+                log(`累积的响应: ${accumulatedResponse}`);
+    
+                if (accumulatedResponse.includes(expectedCommand)) {
+                    if (expectedCommand === '#1' && accumulatedResponse.endsWith('}')) {
+                        // 对于系统信息响应，等待完整的 JSON
+                        clearTimeout(timeoutId);
+                        wifiCharacteristic.removeEventListener('characteristicvaluechanged', responseHandler);
+                        resolve(accumulatedResponse.trim());
+                    } else if (expectedCommand !== '#1' && (accumulatedResponse.includes('\n') || accumulatedResponse.endsWith('}'))) {
+                        // 对于其他响应，等待换行符或 JSON 结束
+                        clearTimeout(timeoutId);
+                        wifiCharacteristic.removeEventListener('characteristicvaluechanged', responseHandler);
+                        resolve(accumulatedResponse.trim());
+                    }
                 }
             };
-
+    
             wifiCharacteristic.addEventListener('characteristicvaluechanged', responseHandler);
         });
     }
@@ -492,5 +502,68 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
         throw new Error(`时间同步失败，已尝试 ${maxRetries} 次`);
+    }
+
+    async function syncTimezone() {
+        try {
+            log('开始同步时区...');
+            if (!checkBluetoothConnection()) {
+                throw new Error('蓝牙设备未连接');
+            }
+    
+            const localTimezoneOffset = new Date().getTimezoneOffset();
+            const timezoneOffset = -localTimezoneOffset;
+            
+            const setTimezoneCommand = `${COMMANDS.SET_TIME_ZONE} ${timezoneOffset}\n`;
+            
+            log(`准备发送时区设置命令: ${setTimezoneCommand}`);
+            await sendCommandWithTimeout(setTimezoneCommand, 5000);
+            log('时区设置命令已发送，等待响应...');
+    
+            try {
+                const response = await waitForResponse('#6', 15000);
+                log(`收到时区设置响应: ${response}`);
+    
+                if (response.includes(`0 ${timezoneOffset}`)) {
+                    log(`时区同步成功，设置为 UTC${timezoneOffset >= 0 ? '+' : '-'}${Math.abs(timezoneOffset / 60)}`);
+                    return; // 成功后直接返回
+                } else {
+                    log(`时区同步响应格式不正确: ${response}`);
+                }
+            } catch (error) {
+                if (error.message.includes('超时')) {
+                    log('时区设置响应超时，尝试验证设置...');
+                } else {
+                    throw error;
+                }
+            }
+    
+            // 验证时区设置
+            log('尝试获取系统信息以验证时区设置...');
+            await sendCommandWithTimeout(`${COMMANDS.GET_SYS_INFO}\n`, 5000);
+            try {
+                const sysInfoResponse = await waitForResponse('#1', 10000);
+                log(`系统信息响应: ${sysInfoResponse}`);
+                
+                // 解析系统信息响应，检查时区设置
+                const tzMatch = sysInfoResponse.match(/"tz":(\d+)/);
+                if (tzMatch) {
+                    const setTz = parseInt(tzMatch[1]);
+                    if (setTz === timezoneOffset) {
+                        log(`时区同步成功，设置为 UTC${setTz >= 0 ? '+' : '-'}${Math.abs(setTz / 60)}`);
+                    } else {
+                        log(`时区设置不匹配。期望: ${timezoneOffset}, 实际: ${setTz}`);
+                    }
+                } else {
+                    log('无法从系统信息中解析时区设置');
+                }
+            } catch (error) {
+                log(`获取系统信息失败: ${error.message}`);
+            }
+    
+        } catch (error) {
+            log(`同步时区失败: ${error.message || error}`);
+            handleError(error);
+        }
     }
 });

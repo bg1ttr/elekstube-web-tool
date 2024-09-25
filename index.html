@@ -65,6 +65,15 @@
             padding: 10px;
             border-radius: 5px;
         }
+        footer {
+            text-align: center;
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #f0f0f0;
+            border-radius: 5px;
+            font-size: 0.9em;
+            color: #666;
+        }
     </style>
 </head>
 <body>
@@ -102,6 +111,11 @@
         </div>
     </div>
     
+    <!-- 修改：版本信息 -->
+    <footer>
+        <p>版本: Commit <span id="version">加载中...</span></p>
+    </footer>
+    
     <script src="app.js"></script>
     <script>
         // 更新本机时间的函数
@@ -123,6 +137,18 @@
         // 每秒更新一次时间
         setInterval(updateLocalTime, 1000);
         updateLocalTime(); // 立即执行一次，避免页面加载后等待 1 秒
+
+        // 获取版本信息
+        fetch('https://api.github.com/repos/bg1ttr/elekstube-web-tool/commits/main')
+            .then(response => response.json())
+            .then(data => {
+                const commitSha = data.sha.substring(0, 7);
+                document.getElementById('version').textContent = commitSha;
+            })
+            .catch(error => {
+                console.error('获取版本信息失败:', error);
+                document.getElementById('version').textContent = '无��获取';
+            });
     </script>
 </body>
 </html>

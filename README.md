@@ -2,6 +2,16 @@
 
 This web application provides a user-friendly interface to control and configure EleksTube IPS Clock devices using Web Bluetooth technology.
 
+## Compatible Devices
+
+This tool is compatible with the following EleksMaker brand EleksTube IPS clock models:
+
+- EleksMaker EleksTube IPS
+- EleksMaker EleksTube IPS PRO  
+- EleksMaker EleksTube IPS PR1/2
+
+Note: This tool is currently not compatible with the EleksTube R model.
+
 ## Features
 
 1. Bluetooth Connection: Scan and connect to EleksTube IPS Clock devices.

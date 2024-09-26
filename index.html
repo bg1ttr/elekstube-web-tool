@@ -57,8 +57,8 @@
             font-weight: bold;
         }
         #local-time {
-            font-size: 1.2em;
-            font-weight: bold;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 14px;
             margin: 20px 0;
             text-align: center;
             background-color: #f0f0f0;
@@ -75,15 +75,14 @@
             color: #666;
         }
         #log-window {
-        background-color: #f0f0f0;
-        border: 1px solid #ccc;
-        border-radius: 4px;
-        padding: 10px;
-        margin-top: 20px;
-        max-height: 400px;
-        overflow-y: auto;
-    }
-
+            background-color: #f0f0f0;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            padding: 10px;
+            margin-top: 20px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
         #log-content {
             font-family: 'Courier New', Courier, monospace;
             font-size: 14px;
@@ -92,30 +91,24 @@
             word-wrap: break-word;
             margin: 0;
         }
-
         .log-entry {
             margin-bottom: 5px;
             padding: 2px 5px;
             border-radius: 3px;
         }
-
         .log-entry:nth-child(even) {
             background-color: #e8e8e8;
         }
-
         .log-time {
             color: #666;
             margin-right: 10px;
         }
-
         .log-info {
             color: #333;
         }
-
         .log-error {
             color: #d32f2f;
         }
-
         .log-warning {
             color: #f57c00;
         }
@@ -125,7 +118,7 @@
     <div class="container">
         <h1>EleksTube IPS 时钟控制</h1>
         
-        <!-- 新增：显示本机时间 -->
+        <!-- 修改：显示本机时间 -->
         <div id="local-time"></div>
         
         <div id="bluetooth-section">
@@ -156,53 +149,7 @@
             <pre id="log-content"></pre>
         </div>
     </div>
-    <style>
-    #log-window {
-        background-color: #f0f0f0;
-        border: 1px solid #ccc;
-        border-radius: 4px;
-        padding: 10px;
-        margin-top: 20px;
-        max-height: 400px;
-        overflow-y: auto;
-    }
 
-    #log-content {
-        font-family: 'Courier New', Courier, monospace;
-        font-size: 14px;
-        line-height: 1.5;
-        white-space: pre-wrap;
-        word-wrap: break-word;
-        margin: 0;
-    }
-
-    .log-entry {
-        margin-bottom: 5px;
-        padding: 2px 5px;
-        border-radius: 3px;
-    }
-
-    .log-entry:nth-child(even) {
-        background-color: #e8e8e8;
-    }
-
-    .log-time {
-        color: #666;
-        margin-right: 10px;
-    }
-
-    .log-info {
-        color: #333;
-    }
-
-    .log-error {
-        color: #d32f2f;
-    }
-
-    .log-warning {
-        color: #f57c00;
-    }
-</style>
     <!-- 修改：版本信息 -->
     <footer>
         <p>版本: Commit <span id="version">加载中...</span></p>

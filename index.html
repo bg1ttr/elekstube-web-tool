@@ -85,6 +85,7 @@
             overflow-y: auto;
         }
         #log-content {
+            text-align: left;
             font-family: 'Courier New', Courier, monospace;
             font-size: 14px;
             line-height: 1.5;
@@ -112,6 +113,18 @@
         }
         .log-warning {
             color: #f57c00;
+        }
+        .log-line {
+            display: block;
+            padding: 2px 5px;
+        }
+
+        .log-line:nth-child(even) {
+            background-color: #f0f0f0;
+        }
+
+        .log-line:nth-child(odd) {
+            background-color: #ffffff;
         }
     </style>
 </head>
@@ -152,7 +165,16 @@
 
         <div id="status"></div>
         <div id="log-window">
-            <pre id="log-content"></pre>
+            <pre id="log-content">
+        <span class="log-line">Welcome to EleksTube IPS Clock Control!</span>
+        
+        <span class="log-line">Instructions:</span>
+        <span class="log-line">1. Click "Scan Bluetooth Devices" to search for your EleksTube IPS Clock.</span>
+        <span class="log-line">2. Select your device from the list that appears.</span>
+        <span class="log-line">3. Once connected, you can configure Wi-Fi, sync time, and adjust other settings.</span>
+        
+        <span class="log-line">Logs will appear here once you start interacting with the device.</span>
+            </pre>
         </div>
     </div>
 

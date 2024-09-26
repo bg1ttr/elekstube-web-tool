@@ -220,19 +220,11 @@
         setInterval(updateLocalTime, 1000);
         updateLocalTime(); // Execute immediately to avoid 1 second delay after page load
 
-        // Get version information and set link
-        fetch('https://api.github.com/repos/bg1ttr/elekstube-web-tool/commits/main')
-            .then(response => response.json())
-            .then(data => {
-                const commitSha = data.sha.substring(0, 7);
-                const versionElement = document.getElementById('version');
-                versionElement.textContent = commitSha;
-                versionElement.href = `https://github.com/bg1ttr/elekstube-web-tool/commit/${data.sha}`;
-            })
-            .catch(error => {
-                console.error('Failed to get version information:', error);
-                document.getElementById('version').textContent = 'Unable to retrieve';
-            });
+        // Set version information
+        const versionElement = document.getElementById('version');
+        const buildDate = new Date().toISOString().split('T')[0]; // Use build date as version
+        versionElement.textContent = buildDate;
+        versionElement.href = 'https://github.com/bg1ttr/elekstube-web-tool';
     </script>
 </body>
 </html>

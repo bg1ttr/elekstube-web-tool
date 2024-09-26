@@ -6,9 +6,9 @@ This web application provides a user-friendly interface to control and configure
 
 This tool is compatible with the following EleksMaker brand EleksTube IPS clock models:
 
-- EleksMaker EleksTube IPS
-- EleksMaker EleksTube IPS PRO  
-- EleksMaker EleksTube IPS PR1/2
+- EleksMaker EleksTube IPS Gen2
+- EleksMaker EleksTube IPS PRO Gen2 
+- EleksMaker EleksTube IPS PR1/2 Gen2
 
 Note: This tool is currently not compatible with the EleksTube R model.
 

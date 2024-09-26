@@ -133,6 +133,20 @@
         .log-line:nth-child(odd) {
             background-color: #ffffff;
         }
+        .copyright-info {
+            font-size: 0.8em;
+            color: #888;
+            margin-top: 5px;
+        }
+
+        .copyright-info a {
+            color: #888;
+            text-decoration: underline;
+        }
+
+        .copyright-info a:hover {
+            color: #666;
+        }
     </style>
 </head>
 <body>
@@ -191,12 +205,17 @@
         <span class="log-line">Logs will appear here once you start interacting with the device.</span>
             </pre>
         </div>
+            <!-- Modified: Version information -->
+    <footer class="terminal-footer">
+        <p class="copyright-info">Version: Commit <a id="version" href="#" target="_blank">Loading...</a></p>
+        <p class="copyright-info">
+            © 2024 EleksMaker. All rights reserved. | 
+            <a href="https://www.elekstube.com" target="_blank">EleksTube.com</a>
+        </p>
+    </footer>
     </div>
 
-    <!-- Modified: Version information -->
-    <footer>
-        <p>Version: Commit <a id="version" href="#" target="_blank">Loading...</a></p>
-    </footer>
+
     
     <script src="app.js"></script>
     <script>
@@ -227,4 +246,5 @@
         versionElement.href = 'https://github.com/bg1ttr/elekstube-web-tool';
     </script>
 </body>
+
 </html>

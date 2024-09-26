@@ -40,7 +40,3 @@ This web application provides a user-friendly interface to control and configure
 ## Contributing
 
 We welcome contributions! Please feel free to submit pull requests or create issues for bugs and feature requests.
-
-## License
-
-[MIT License](LICENSE)

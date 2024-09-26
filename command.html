@@ -4,12 +4,49 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EleksTube Command Tester</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/normalize/8.0.1/normalize.min.css">
     <style>
-        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+        html {
+            box-sizing: border-box;
+        }
+        *, *:before, *:after {
+            box-sizing: inherit;
+        }
+        body { 
+            font-family: Arial, sans-serif; 
+            max-width: 800px; 
+            margin: 0 auto; 
+            padding: 20px; 
+            line-height: 1.6;
+        }
         h1, h2 { color: #333; }
-        select, input, button { margin: 10px 0; padding: 5px; }
-        #response, #log { border: 1px solid #ddd; padding: 10px; min-height: 100px; margin-top: 20px; overflow-y: auto; }
+        select, input, button { 
+            margin: 10px 0; 
+            padding: 5px; 
+            font-size: 16px;
+        }
+        button {
+            background: #333;
+            color: #fff;
+            border: none;
+            padding: 10px 15px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #555;
+        }
+        #response, #log { 
+            border: 1px solid #ddd; 
+            padding: 10px; 
+            min-height: 100px; 
+            margin-top: 20px; 
+            overflow-y: auto; 
+        }
         #log { max-height: 200px; }
+        pre {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
     </style>
 </head>
 <body>

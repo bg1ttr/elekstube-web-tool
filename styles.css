@@ -5,7 +5,13 @@ body {
     padding: 0;
     background-color: #f4f4f4;
 }
+html {
+    box-sizing: border-box;
+}
 
+*, *:before, *:after {
+    box-sizing: inherit;
+}
 .container {
     width: 80%;
     margin: auto;

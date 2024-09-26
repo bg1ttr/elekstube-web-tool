@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EleksTube Command Tester</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+        h1, h2 { color: #333; }
+        select, input, button { margin: 10px 0; padding: 5px; }
+        #response, #log { border: 1px solid #ddd; padding: 10px; min-height: 100px; margin-top: 20px; overflow-y: auto; }
+        #log { max-height: 200px; }
+    </style>
+</head>
+<body>
+    <h1>EleksTube Command Tester</h1>
+    <button onclick="connectToDevice()">Connect to Device</button>
+    <div>
+        <select id="commandSelect">
+            <option value="#0">SYS_HANDSHAKE (#0)</option>
+            <option value="#1">GET_SYS_INFO (#1)</option>
+            <option value="#2">SET_SYS_POWER (#2)</option>
+            <option value="#3">SET_SYS_RESTART (#3)</option>
+            <option value="#4">SET_TIME (#4)</option>
+            <option value="#5">SET_TIME_FORMAT (#5)</option>
+            <option value="#6">SET_TIME_ZONE (#6)</option>
+            <option value="#7">SET_TFT_STYLE (#7)</option>
+            <option value="#8">SET_TFT_MODE (#8)</option>
+            <option value="#9">SET_TFT_ROTATE (#9)</option>
+            <option value="#10">SET_TFT_POWER (#10)</option>
+            <option value="#11">SET_LED_POWER (#11)</option>
+            <option value="#12">SET_LED_STYLE (#12)</option>
+            <option value="#13">SET_LED_BRIGHTNESS (#13)</option>
+            <option value="#14">SET_LED_COLOR (#14)</option>
+            <option value="#15">SET_LED_COLORS (#15)</option>
+            <option value="#16">GET_WIFI_LIST (#16)</option>
+            <option value="#17">GET_WIFI_STATE (#17)</option>
+            <option value="#18">SET_WIFI (#18)</option>
+            <option value="#19">FS_FORMAT (#19)</option>
+            <option value="#20">FS_DOWNLOAD_FILE (#20)</option>
+            <option value="#21">FS_DOWNLOAD_ALBUM (#21)</option>
+            <option value="#22">SET_NTP_SERVER (#22)</option>
+            <option value="#23">SET_NTP_INTERVAL (#23)</option>
+            <option value="#24">SYS_UPDATA_FFS (#24)</option>
+            <option value="#25">SET_SPECIAL_STATE (#25)</option>
+            <option value="#26">GET_SPECIAL_STATE (#26)</option>
+            <option value="#27">SET_SPECIAL_INFO (#27)</option>
+            <option value="#28">SET_CITY_CODE (#28)</option>
+            <option value="#29">SET_BILIBILI_ID (#29)</option>
+            <option value="#30">SET_TIKTOK_ID (#30)</option>
+            <option value="#31">SET_YOUTUB_ID (#31)</option>
+            <option value="#222">GET_UID (#222)</option>
+            <option value="#233">SET_TOKEN (#233)</option>
+            <option value="#234">TEST_TOKEN (#234)</option>
+            <option value="#235">DEL_TOKEN (#235)</option>
+        </select>
+        <input type="text" id="paramInput" placeholder="Parameters (if needed)">
+        <button onclick="sendCommand()">Send Command</button>
+    </div>
+    <div id="response">
+        <h2>Response:</h2>
+        <pre id="responseContent"></pre>
+    </div>
+    <div id="log">
+        <h2>Log:</h2>
+        <pre id="logContent"></pre>
+    </div>
+
+    <script>
+        let bluetoothDevice;
+        let gattServer;
+        let wifiCharacteristic;
+
+        function log(message) {
+            console.log(message);
+            const logContent = document.getElementById('logContent');
+            const timestamp = new Date().toLocaleTimeString();
+            logContent.textContent += `[${timestamp}] ${message}\n`;
+            logContent.scrollTop = logContent.scrollHeight;
+        }
+
+        async function connectToDevice() {
+            try {
+                log('Starting device scan...');
+                bluetoothDevice = await navigator.bluetooth.requestDevice({
+                    filters: [{ namePrefix: 'EleksIPS' }],
+                    optionalServices: ['4fafc201-1fb5-459e-8fcc-c5c9c331914b']
+                });
+                log(`Device found: ${bluetoothDevice.name}`);
+                
+                gattServer = await bluetoothDevice.gatt.connect();
+                log('GATT server connected');
+
+                const service = await gattServer.getPrimaryService('4fafc201-1fb5-459e-8fcc-c5c9c331914b');
+                log(`Service found: ${service.uuid}`);
+
+                wifiCharacteristic = await service.getCharacteristic('beb5483e-36e1-4688-b7f5-ea07361b26a8');
+                log(`Characteristic found: ${wifiCharacteristic.uuid}`);
+
+                await wifiCharacteristic.startNotifications();
+                wifiCharacteristic.addEventListener('characteristicvaluechanged', handleCharacteristicValueChanged);
+                log('Notifications started');
+
+                log('Device connected and ready');
+            } catch (error) {
+                log(`Connection error: ${error.message || error}`);
+            }
+        }
+
+        function handleCharacteristicValueChanged(event) {
+            const value = new TextDecoder().decode(event.target.value);
+            log(`Received data: ${value}`);
+        }
+
+        async function sendCommand() {
+            const command = document.getElementById('commandSelect').value;
+            const params = document.getElementById('paramInput').value;
+            const fullCommand = `${command} ${params}`.trim() + '\n';
+
+            try {
+                if (!bluetoothDevice || !gattServer || !wifiCharacteristic) {
+                    log('Not connected. Please connect to a device first.');
+                    return;
+                }
+                log(`Sending command: ${fullCommand.trim()}`);
+                await sendBLEData(fullCommand);
+                const response = await waitForResponse(command, 10000);
+                document.getElementById('responseContent').textContent = response;
+            } catch (error) {
+                log(`Error: ${error.message}`);
+                document.getElementById('responseContent').textContent = `Error: ${error.message}`;
+            }
+        }
+
+        async function sendBLEData(data) {
+            const encoder = new TextEncoder();
+            const dataArray = encoder.encode(data);
+            const chunkSize = 20;
+            
+            for (let i = 0; i < dataArray.length; i += chunkSize) {
+                const chunk = dataArray.slice(i, i + chunkSize);
+                await wifiCharacteristic.writeValue(chunk);
+                log(`Sent data chunk: ${i/chunkSize + 1}`);
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
+        }
+
+        function waitForResponse(expectedCommand, timeout) {
+            return new Promise((resolve, reject) => {
+                const timeoutId = setTimeout(() => {
+                    reject(new Error(`Waiting for response timed out: ${expectedCommand}`));
+                }, timeout);
+
+                let accumulatedResponse = '';
+
+                const responseHandler = (event) => {
+                    const response = new TextDecoder().decode(event.target.value);
+                    accumulatedResponse += response;
+                    log(`Accumulated response: ${accumulatedResponse}`);
+
+                    if (accumulatedResponse.includes(expectedCommand) && 
+                        (accumulatedResponse.includes('\n') || accumulatedResponse.endsWith('}'))) {
+                        clearTimeout(timeoutId);
+                        wifiCharacteristic.removeEventListener('characteristicvaluechanged', responseHandler);
+                        resolve(accumulatedResponse.trim());
+                    }
+                };
+
+                wifiCharacteristic.addEventListener('characteristicvaluechanged', responseHandler);
+            });
+        }
+    </script>
+</body>
+</html>

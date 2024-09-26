@@ -148,6 +148,16 @@
         .copyright-info a:hover {
             color: #666;
         }
+        .wifi-note {
+            font-size: 0.9em;
+            color: #ffa500;  /* 使用橙色来引起注意 */
+            margin-bottom: 15px;
+        }
+
+        input::placeholder {
+            color: #666;
+            font-style: italic;
+        }
     </style>
     <script type="application/ld+json">
     {
@@ -182,11 +192,12 @@
         
         <div id="wifi-section" style="display: none;">
             <h2>Wi-Fi Configuration</h2>
+            <p class="wifi-note">Note: Please use a 2.4GHz Wi-Fi network. 5GHz networks are not supported.</p>
             <form id="wifi-form">
                 <label for="ssid">Wi-Fi SSID:</label>
-                <input type="text" id="ssid" required>
+                <input type="text" id="ssid" placeholder="Enter your Wi-Fi network name" required>
                 <label for="password">Wi-Fi Password:</label>
-                <input type="password" id="password" required>
+                <input type="password" id="password" placeholder="Enter your Wi-Fi password" required>
                 <button type="submit">Configure Wi-Fi</button>
                 <button type="button" id="sync-time-button">Sync Time</button>
                 <button id="sync-timezone-button">Sync Timezone</button>

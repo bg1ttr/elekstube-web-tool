@@ -74,6 +74,51 @@
             font-size: 0.9em;
             color: #666;
         }
+        #log-window {
+        background-color: #f0f0f0;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        padding: 10px;
+        margin-top: 20px;
+        max-height: 400px;
+        overflow-y: auto;
+    }
+
+        #log-content {
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 14px;
+            line-height: 1.5;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            margin: 0;
+        }
+
+        .log-entry {
+            margin-bottom: 5px;
+            padding: 2px 5px;
+            border-radius: 3px;
+        }
+
+        .log-entry:nth-child(even) {
+            background-color: #e8e8e8;
+        }
+
+        .log-time {
+            color: #666;
+            margin-right: 10px;
+        }
+
+        .log-info {
+            color: #333;
+        }
+
+        .log-error {
+            color: #d32f2f;
+        }
+
+        .log-warning {
+            color: #f57c00;
+        }
     </style>
 </head>
 <body>
@@ -111,7 +156,53 @@
             <pre id="log-content"></pre>
         </div>
     </div>
-    
+    <style>
+    #log-window {
+        background-color: #f0f0f0;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        padding: 10px;
+        margin-top: 20px;
+        max-height: 400px;
+        overflow-y: auto;
+    }
+
+    #log-content {
+        font-family: 'Courier New', Courier, monospace;
+        font-size: 14px;
+        line-height: 1.5;
+        white-space: pre-wrap;
+        word-wrap: break-word;
+        margin: 0;
+    }
+
+    .log-entry {
+        margin-bottom: 5px;
+        padding: 2px 5px;
+        border-radius: 3px;
+    }
+
+    .log-entry:nth-child(even) {
+        background-color: #e8e8e8;
+    }
+
+    .log-time {
+        color: #666;
+        margin-right: 10px;
+    }
+
+    .log-info {
+        color: #333;
+    }
+
+    .log-error {
+        color: #d32f2f;
+    }
+
+    .log-warning {
+        color: #f57c00;
+    }
+</style>
     <!-- 修改：版本信息 -->
     <footer>
         <p>版本: Commit <span id="version">加载中...</span></p>
@@ -148,7 +239,7 @@
             })
             .catch(error => {
                 console.error('获取版本信息失败:', error);
-                document.getElementById('version').textContent = '无��获取';
+                document.getElementById('version').textContent = '无法获取';
             });
     </script>
 </body>

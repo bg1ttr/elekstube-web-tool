@@ -152,7 +152,7 @@
 
     <!-- 修改：版本信息 -->
     <footer>
-        <p>版本: Commit <span id="version">加载中...</span></p>
+        <p>版本: Commit <a id="version" href="#" target="_blank">加载中...</a></p>
     </footer>
     
     <script src="app.js"></script>
@@ -177,12 +177,14 @@
         setInterval(updateLocalTime, 1000);
         updateLocalTime(); // 立即执行一次，避免页面加载后等待 1 秒
 
-        // 获取版本信息
+        // 获取版本信息并设置链接
         fetch('https://api.github.com/repos/bg1ttr/elekstube-web-tool/commits/main')
             .then(response => response.json())
             .then(data => {
                 const commitSha = data.sha.substring(0, 7);
-                document.getElementById('version').textContent = commitSha;
+                const versionElement = document.getElementById('version');
+                versionElement.textContent = commitSha;
+                versionElement.href = `https://github.com/bg1ttr/elekstube-web-tool/commit/${data.sha}`;
             })
             .catch(error => {
                 console.error('获取版本信息失败:', error);

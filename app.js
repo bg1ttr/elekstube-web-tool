@@ -75,10 +75,10 @@ document.addEventListener('DOMContentLoaded', () => {
     syncTimezoneButton.addEventListener('click', syncTimezone);
 
     if (scanButton) {
-        log('找到扫描按钮，添加事件监听器');
+        log('Scan button found, adding event listener');
         scanButton.addEventListener('click', scanForDevices);
     } else {
-        log('错误：未找到扫描按钮');
+        log('Error: Scan button not found');
     }
 
     resetButton.addEventListener('click', resetApp);
@@ -87,32 +87,32 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function onDisconnected(event) {
         const device = event.target;
-        log(`设备 ${device.name} 已断开连接`);
-        connectionStatus.textContent = '已断开连接';
+        log(`Device ${device.name} disconnected`);
+        connectionStatus.textContent = 'Disconnected';
         document.getElementById('wifi-section').style.display = 'none';
     }
 
     async function scanForDevices() {
-        log('扫描函数被调用');
+        log('Scan function called');
         try {
-            log('开始扫描设备...');
+            log('Starting device scan...');
             if (!navigator.bluetooth) {
-                throw new Error('浏览器不支持 Web Bluetooth API');
+                throw new Error('Browser does not support Web Bluetooth API');
             }
             const device = await navigator.bluetooth.requestDevice({
                 filters: [{ namePrefix: 'EleksIPS' }],
                 optionalServices: ['4fafc201-1fb5-459e-8fcc-c5c9c331914b']
             });
-            log(`找到设备: ${device.name}`);
-            log('尝试连接到设备...');
+            log(`Device found: ${device.name}`);
+            log('Attempting to connect to device...');
             await connectToDevice(device);
         } catch (error) {
             if (error.name === 'NotFoundError') {
-                log('未找到匹配的蓝牙设备');
+                log('No matching Bluetooth devices found');
             } else if (error.name === 'SecurityError') {
-                log('用户拒绝了蓝牙权限请求');
+                log('User denied Bluetooth permission request');
             } else {
-                log(`扫描设备错误: ${error.name} - ${error.message}`);
+                log(`Error scanning for devices: ${error.name} - ${error.message}`);
             }
             handleError(error);
         }
@@ -121,189 +121,189 @@ document.addEventListener('DOMContentLoaded', () => {
     async function connectToDevice(device) {
         try {
             bluetoothDevice = device;
-            log(`正在连接到 ${device.name}...`);
+            log(`Connecting to ${device.name}...`);
             
             gattServer = await device.gatt.connect();
-            log('GATT服务器已连接');
+            log('GATT server connected');
 
             device.addEventListener('gattserverdisconnected', onDisconnected);
 
-            log('尝试获取服务...');
+            log('Attempting to get service...');
             const service = await gattServer.getPrimaryService('4fafc201-1fb5-459e-8fcc-c5c9c331914b');
-            log(`找到服务: ${service.uuid}`);
+            log(`Service found: ${service.uuid}`);
 
-            log('尝试获取特征...');
+            log('Attempting to get characteristic...');
             wifiCharacteristic = await service.getCharacteristic('beb5483e-36e1-4688-b7f5-ea07361b26a8');
-            log(`找到可写入的特征: ${wifiCharacteristic.uuid}`);
+            log(`Writable characteristic found: ${wifiCharacteristic.uuid}`);
 
-            log('开始监听特征值变化...');
+            log('Starting to listen for characteristic value changes...');
             await wifiCharacteristic.startNotifications();
             wifiCharacteristic.addEventListener('characteristicvaluechanged', handleCharacteristicValueChanged);
 
-            connectionStatus.textContent = `已连接到 ${device.name}`;
+            connectionStatus.textContent = `Connected to ${device.name}`;
             document.getElementById('wifi-section').style.display = 'block';
-            log(`成功连接到设备 ${device.name}`);
-            log('执行握手...');
+            log(`Successfully connected to device ${device.name}`);
+            log('Performing handshake...');
             await performHandshake();
-            log('握手完成');
+            log('Handshake completed');
         } catch (error) {
-            log(`连接错误: ${error.message || error}`);
+            log(`Connection error: ${error.message || error}`);
             handleError(error);
         }
     }
 
     function handleCharacteristicValueChanged(event) {
         const value = new TextDecoder().decode(event.target.value);
-        log(`收到原始数据: ${value}`);
+        log(`Received raw data: ${value}`);
         receivedData += value;
         
-        log(`当前累积数据: ${receivedData}`);
+        log(`Current accumulated data: ${receivedData}`);
         
         if (receivedData.includes('\n') || receivedData.length > 20) {
-            log(`处理完整响应: ${receivedData}`);
+            log(`Processing complete response: ${receivedData}`);
             parseDeviceResponse(receivedData);
             receivedData = '';
         }
     }
 
     function parseDeviceResponse(response) {
-        log(`开始解析响应: ${response}`);
+        log(`Starting to parse response: ${response}`);
         const commands = response.split('#').filter(cmd => cmd.trim().length > 0);
         
         if (commands.length === 0) {
-            log('没有找到有效的命令');
+            log('No valid commands found');
             return;
         }
         
         commands.forEach(cmd => {
             const parts = cmd.trim().split(' ');
-            log(`解析命令: ${cmd}`);
+            log(`Parsing command: ${cmd}`);
             switch (parts[0]) {
                 case '0':
-                    log('收到握手响应');
+                    log('Received handshake response');
                     break;
                 case '1':
-                    // 处理系统信息
+                    // Handle system information
                     let sysInfo = parts.slice(1).join(' ');
                     try {
                         sysInfo = JSON.parse(sysInfo);
-                        log(`解析的系统信息: ${JSON.stringify(sysInfo)}`);
-                        // 这里可以添加对系统时间的解析和验证
+                        log(`Parsed system info: ${JSON.stringify(sysInfo)}`);
+                        // Add parsing and validation of system time here
                     } catch (error) {
-                        log(`系统信息解析失败: ${error.message}`);
+                        log(`Failed to parse system info: ${error.message}`);
                     }
                     break;
                 case '4':
-                    log(`收到时间同步响应: ${parts.slice(1).join(' ')}`);
+                    log(`Received time sync response: ${parts.slice(1).join(' ')}`);
                     if (parts[1] === '0') {
                         const syncedTime = parts.slice(2).join(' ');
-                        log(`时间同步响应，设备时间: ${syncedTime}`);
+                        log(`Time sync response, device time: ${syncedTime}`);
                     } else {
-                        log('时间同步失败');
+                        log('Time sync failed');
                     }
                     break;
                 case '6':
-                    log(`收到时区设置响应: ${parts.slice(1).join(' ')}`);
+                    log(`Received timezone setting response: ${parts.slice(1).join(' ')}`);
                     break;
                 case '17':
-                    log(`收到Wi-Fi状态响应: ${parts.slice(1).join(' ')}`);
+                    log(`Received Wi-Fi status response: ${parts.slice(1).join(' ')}`);
                     if (parts[1] === '0' && parts[2] === '1') {
-                        log('Wi-Fi 连接成功');
+                        log('Wi-Fi connected successfully');
                     } else {
-                        log('Wi-Fi 连接失败或状态未知');
+                        log('Wi-Fi connection failed or status unknown');
                     }
                     break;
                 case '18':
-                    log(`收到Wi-Fi配置响应: ${parts.slice(1).join(' ')}`);
+                    log(`Received Wi-Fi configuration response: ${parts.slice(1).join(' ')}`);
                     if (parts[1] === '0') {
-                        log('Wi-Fi 配置成功接收');
+                        log('Wi-Fi configuration received successfully');
                     } else {
-                        log('Wi-Fi 配置接收失败');
+                        log('Wi-Fi configuration reception failed');
                     }
                     break;
-                // ... 其他 case 语句 ...
+                // ... other case statements ...
                 default:
-                    log(`未知响应: #${cmd}`);
+                    log(`Unknown response: #${cmd}`);
             }
         });
     }
 
     function handleWiFiConfigResponse(parts) {
         if (parts[1] === '0') {
-            log('Wi-Fi 配置成功');
-            wifiStatus.textContent = '已配置';
+            log('Wi-Fi configuration successful');
+            wifiStatus.textContent = 'Configured';
         } else {
-            log('Wi-Fi 配置失败');
-            wifiStatus.textContent = '配置失败';
+            log('Wi-Fi configuration failed');
+            wifiStatus.textContent = 'Configuration failed';
             retryWiFiConfig();
         }
     }
 
     function handleWiFiStateResponse(parts) {
         if (parts[1] === '0') {
-            log('Wi-Fi 已连接');
-            wifiStatus.textContent = '已连接';
+            log('Wi-Fi connected');
+            wifiStatus.textContent = 'Connected';
         } else {
-            log('Wi-Fi 未连接');
-            wifiStatus.textContent = '未连接';
+            log('Wi-Fi not connected');
+            wifiStatus.textContent = 'Not connected';
         }
     }
 
     async function configureWiFi(event) {
         event.preventDefault();
-        log('开始配置 Wi-Fi...');
+        log('Starting Wi-Fi configuration...');
         const ssid = document.getElementById('ssid').value;
         const password = document.getElementById('password').value;
         
         if (!ssid || !password) {
-            log('请输入 SSID 和密码');
+            log('Please enter SSID and password');
             return;
         }
 
         try {
             await sendWiFiConfig(ssid, password);
-            log('Wi-Fi 配置已发送');
+            log('Wi-Fi configuration sent');
             
-            // 等待一段时间后检查 Wi-Fi 状态
+            // Wait for a while before checking Wi-Fi status
             await new Promise(resolve => setTimeout(resolve, 10000));
-            log('检查 Wi-Fi 状态...');
+            log('Checking Wi-Fi status...');
             await sendCommandWithTimeout(COMMANDS.GET_WIFI_STATE + '\n', 5000);
 
-            log('Wi-Fi 配置已完成。请手动重启设备以使新的 Wi-Fi 设置生效。');
-            alert('Wi-Fi 配置已完成。请手动重启设备以使新的 Wi-Fi 设置生效。');
+            log('Wi-Fi configuration completed. Please restart the device manually for the new Wi-Fi settings to take effect.');
+            alert('Wi-Fi configuration completed. Please restart the device manually for the new Wi-Fi settings to take effect.');
 
         } catch (error) {
-            log(`Wi-Fi 配置错误: ${error.message || error}`);
+            log(`Wi-Fi configuration error: ${error.message || error}`);
             handleError(error);
         }
     }
 
     async function sendWiFiConfig(ssid, password) {
         const encodedSsid = customEncode(ssid);
-        const encodedPassword = password; // 密码似乎没有被编码
+        const encodedPassword = password; // Password doesn't seem to be encoded
         const command = `${COMMANDS.SET_WIFI} ${encodedSsid} ${encodedPassword}\n`;
         
-        log(`准备发送Wi-Fi配置: SSID=${ssid}, Password=****`);
+        log(`Preparing to send Wi-Fi configuration: SSID=${ssid}, Password=****`);
         await sendBLEData(command);
-        log('Wi-Fi配置数据已发送');
+        log('Wi-Fi configuration data sent');
     }
 
     async function sendBLEData(data) {
         try {
             const encoder = new TextEncoder();
             const dataArray = encoder.encode(data);
-            const chunkSize = 20; // 蓝牙数据包通常限制为20字节
+            const chunkSize = 20; // Bluetooth packets are typically limited to 20 bytes
             
             for (let i = 0; i < dataArray.length; i += chunkSize) {
                 const chunk = dataArray.slice(i, i + chunkSize);
                 await wifiCharacteristic.writeValue(chunk);
-                log(`发送数据块: ${i/chunkSize + 1}`);
-                await new Promise(resolve => setTimeout(resolve, 100)); // 短暂延迟，避免发送过快
+                log(`Sent data chunk: ${i/chunkSize + 1}`);
+                await new Promise(resolve => setTimeout(resolve, 100)); // Short delay to avoid sending too fast
             }
             
-            log(`数据发送完成: ${data}`);
+            log(`Data sending completed: ${data}`);
         } catch (error) {
-            log(`发送数据失败: ${error.message || error}`);
+            log(`Failed to send data: ${error.message || error}`);
             throw error;
         }
     }
@@ -311,13 +311,13 @@ document.addEventListener('DOMContentLoaded', () => {
     async function performHandshake() {
         try {
             const command = COMMANDS.SYS_HANDSHAKE + '\n';
-            log(`发送握手命令: ${command}`);
+            log(`Sending handshake command: ${command}`);
             await sendCommandWithTimeout(command, 10000);
-            log('握手命令已发送，等待响应...');
+            log('Handshake command sent, waiting for response...');
             await new Promise(resolve => setTimeout(resolve, 5000));
-            log('握手等待结束');
+            log('Handshake wait ended');
         } catch (error) {
-            log(`握手失败: ${error.message || error}`);
+            log(`Handshake failed: ${error.message || error}`);
             handleError(error);
         }
     }
@@ -325,15 +325,15 @@ document.addEventListener('DOMContentLoaded', () => {
     async function retryWiFiConfig() {
         if (retryCount < MAX_RETRIES) {
             retryCount++;
-            log(`尝试重新配置Wi-Fi（第${retryCount}次）...`);
+            log(`Attempting to reconfigure Wi-Fi (Attempt ${retryCount})...`);
             await configureWiFi({ preventDefault: () => {} });
         } else {
-            log('Wi-Fi配置失败，请检查SSID和密码是否正确，或尝试重新配置');
+            log('Wi-Fi configuration failed, please check SSID and password or try reconfiguring');
         }
     }
 
     function resetApp() {
-        log('重置应用...');
+        log('Resetting application...');
         if (bluetoothDevice) {
             if (bluetoothDevice.gatt.connected) {
                 bluetoothDevice.gatt.disconnect();
@@ -345,25 +345,25 @@ document.addEventListener('DOMContentLoaded', () => {
         wifiCharacteristic = null;
         connectionStatus.textContent = '';
         wifiStatus.textContent = '';
-        document.getElementById('log-content').textContent = '';  // 清空日志窗口
+        document.getElementById('log-content').textContent = '';  // Clear log window
         document.getElementById('wifi-section').style.display = 'none';
         retryCount = 0;
         receivedData = '';
         operationQueue = [];
         isProcessingQueue = false;
-        log('应用已重置');
+        log('Application reset');
     }
 
     function handleError(error) {
         console.error('Error:', error);
-        log(`错误: ${error.message || error}`);
+        log(`Error: ${error.message || error}`);
     }
 
     async function syncTime() {
         try {
-            log('开始同步时间...');
+            log('Starting time synchronization...');
             if (!checkBluetoothConnection()) {
-                throw new Error('蓝牙设备未连接');
+                throw new Error('Bluetooth device not connected');
             }
             
             const now = new Date();
@@ -374,46 +374,46 @@ document.addEventListener('DOMContentLoaded', () => {
             const minutes = now.getMinutes().toString().padStart(2, '0');
             const seconds = now.getSeconds().toString().padStart(2, '0');
     
-            // 设置时间
+            // Set time
             const setTimeCommand = `${COMMANDS.SET_TIME} 0 ${year}-${month}-${day} ${hours}:${minutes}:${seconds}\n`;
-            log(`准备发送时间同步命令: ${setTimeCommand}`);
+            log(`Preparing to send time sync command: ${setTimeCommand}`);
             await sendCommandWithTimeout(setTimeCommand, 5000);
-            log('时间同步命令已发送，等待响应...');
+            log('Time sync command sent, waiting for response...');
             
-            // 等待并验证时间同步响应
+            // Wait for and validate time sync response
             const timeResponse = await waitForResponse('#4', 10000);
             const syncedTime = parseTimeResponse(timeResponse);
             if (!isTimeValid(syncedTime, now)) {
-                log(`警告：设备返回的时间不正确: ${syncedTime}`);
-                // 尝试重新同步时间
+                log(`Warning: Device returned incorrect time: ${syncedTime}`);
+                // Attempt to resync time
                 await retryTimeSync(3);
             } else {
-                log(`时间同步成功，设备时间: ${syncedTime}`);
+                log(`Time sync successful, device time: ${syncedTime}`);
             }
 
-            // 设置时区
+            // Set timezone
             const timezoneOffset = -now.getTimezoneOffset();
             const setTimezoneCommand = `${COMMANDS.SET_TIME_ZONE} ${timezoneOffset}\n`;
-            log(`准备发送时区设置命令: ${setTimezoneCommand}`);
+            log(`Preparing to send timezone setting command: ${setTimezoneCommand}`);
             await sendCommandWithTimeout(setTimezoneCommand, 5000);
-            log('时区设置命令已发送，等待响应...');
-            await new Promise(resolve => setTimeout(resolve, 2000)); // 等待2秒
+            log('Timezone setting command sent, waiting for response...');
+            await new Promise(resolve => setTimeout(resolve, 2000)); // Wait for 2 seconds
     
-            // 再次检查时间，确保设置成功
+            // Check time again to ensure settings were successful
             const checkTimeCommand = `${COMMANDS.GET_SYS_INFO}\n`;
-            log(`准备发送时间检查命令: ${checkTimeCommand}`);
+            log(`Preparing to send time check command: ${checkTimeCommand}`);
             await sendCommandWithTimeout(checkTimeCommand, 5000);
-            log('时间检查命令已发送，等待响应...');
+            log('Time check command sent, waiting for response...');
 
         } catch (error) {
-            log(`同步时间失败: ${error.message || error}`);
+            log(`Time sync failed: ${error.message || error}`);
             handleError(error);
         }
     }
 
     function checkBluetoothConnection() {
         if (!bluetoothDevice || !bluetoothDevice.gatt.connected) {
-            log('蓝牙设备未连接');
+            log('Bluetooth device not connected');
             return false;
         }
         return true;
@@ -422,12 +422,12 @@ document.addEventListener('DOMContentLoaded', () => {
     async function sendCommandWithTimeout(command, timeout = 5000) {
         return new Promise(async (resolve, reject) => {
             const timeoutId = setTimeout(() => {
-                reject(new Error('命令执行超时'));
+                reject(new Error('Command execution timed out'));
             }, timeout);
 
             try {
                 if (!checkBluetoothConnection()) {
-                    throw new Error('蓝牙设备未连接');
+                    throw new Error('Bluetooth device not connected');
                 }
                 await sendBLEData(command);
                 clearTimeout(timeoutId);
@@ -444,20 +444,20 @@ document.addEventListener('DOMContentLoaded', () => {
         if (parts.length >= 4) {
             return `${parts[2]} ${parts[3]}`;
         }
-        throw new Error('无效的时间响应格式');
+        throw new Error('Invalid time response format');
     }
 
     function isTimeValid(syncedTime, referenceTime) {
         const synced = new Date(syncedTime);
         const reference = new Date(referenceTime);
         const diff = Math.abs(synced - reference);
-        return diff < 60000; // 允许1分钟的误差
+        return diff < 60000; // Allow 1 minute difference
     }
 
     function waitForResponse(expectedCommand, timeout = 15000) {
         return new Promise((resolve, reject) => {
             const timeoutId = setTimeout(() => {
-                reject(new Error(`等待响应超时: ${expectedCommand}`));
+                reject(new Error(`Waiting for response timed out: ${expectedCommand}`));
             }, timeout);
     
             let accumulatedResponse = '';
@@ -465,16 +465,16 @@ document.addEventListener('DOMContentLoaded', () => {
             const responseHandler = (event) => {
                 const response = new TextDecoder().decode(event.target.value);
                 accumulatedResponse += response;
-                log(`累积的响应: ${accumulatedResponse}`);
+                log(`Accumulated response: ${accumulatedResponse}`);
     
                 if (accumulatedResponse.includes(expectedCommand)) {
                     if (expectedCommand === '#1' && accumulatedResponse.endsWith('}')) {
-                        // 对于系统信息响应，等待完整的 JSON
+                        // For system info response, wait for complete JSON
                         clearTimeout(timeoutId);
                         wifiCharacteristic.removeEventListener('characteristicvaluechanged', responseHandler);
                         resolve(accumulatedResponse.trim());
                     } else if (expectedCommand !== '#1' && (accumulatedResponse.includes('\n') || accumulatedResponse.endsWith('}'))) {
-                        // 对于其他响应，等待换行符或 JSON 结束
+                        // For other responses, wait for newline or JSON end
                         clearTimeout(timeoutId);
                         wifiCharacteristic.removeEventListener('characteristicvaluechanged', responseHandler);
                         resolve(accumulatedResponse.trim());
@@ -488,7 +488,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function retryTimeSync(maxRetries) {
         for (let i = 0; i < maxRetries; i++) {
-            log(`尝试重新同步时间，第 ${i + 1} 次...`);
+            log(`Attempting to resync time, attempt ${i + 1}...`);
             const now = new Date();
             const setTimeCommand = `${COMMANDS.SET_TIME} 0 ${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')} ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}\n`;
             
@@ -497,18 +497,18 @@ document.addEventListener('DOMContentLoaded', () => {
             const syncedTime = parseTimeResponse(timeResponse);
             
             if (isTimeValid(syncedTime, now)) {
-                log(`重新同步成功，设备时间: ${syncedTime}`);
+                log(`Resync successful, device time: ${syncedTime}`);
                 return;
             }
         }
-        throw new Error(`时间同步失败，已尝试 ${maxRetries} 次`);
+        throw new Error(`Time sync failed after ${maxRetries} attempts`);
     }
 
     async function syncTimezone() {
         try {
-            log('开始同步时区...');
+            log('Starting timezone synchronization...');
             if (!checkBluetoothConnection()) {
-                throw new Error('蓝牙设备未连接');
+                throw new Error('Bluetooth device not connected');
             }
     
             const localTimezoneOffset = new Date().getTimezoneOffset();
@@ -516,53 +516,53 @@ document.addEventListener('DOMContentLoaded', () => {
             
             const setTimezoneCommand = `${COMMANDS.SET_TIME_ZONE} ${timezoneOffset}\n`;
             
-            log(`准备发送时区设置命令: ${setTimezoneCommand}`);
+            log(`Preparing to send timezone setting command: ${setTimezoneCommand}`);
             await sendCommandWithTimeout(setTimezoneCommand, 5000);
-            log('时区设置命令已发送，等待响应...');
+            log('Timezone setting command sent, waiting for response...');
     
             try {
                 const response = await waitForResponse('#6', 15000);
-                log(`收到时区设置响应: ${response}`);
+                log(`Received timezone setting response: ${response}`);
     
                 if (response.includes(`0 ${timezoneOffset}`)) {
-                    log(`时区同步成功，设置为 UTC${timezoneOffset >= 0 ? '+' : '-'}${Math.abs(timezoneOffset / 60)}`);
-                    return; // 成功后直接返回
+                    log(`Timezone sync successful, set to UTC${timezoneOffset >= 0 ? '+' : '-'}${Math.abs(timezoneOffset / 60)}`);
+                    return; // Return directly if successful
                 } else {
-                    log(`时区同步响应格式不正确: ${response}`);
+                    log(`Timezone sync response format incorrect: ${response}`);
                 }
             } catch (error) {
-                if (error.message.includes('超时')) {
-                    log('时区设置响应超时，尝试验证设置...');
+                if (error.message.includes('timeout')) {
+                    log('Timezone setting response timed out, attempting to verify setting...');
                 } else {
                     throw error;
                 }
             }
     
-            // 验证时区设置
-            log('尝试获取系统信息以验证时区设置...');
+            // Verify timezone setting
+            log('Attempting to get system info to verify timezone setting...');
             await sendCommandWithTimeout(`${COMMANDS.GET_SYS_INFO}\n`, 5000);
             try {
                 const sysInfoResponse = await waitForResponse('#1', 10000);
-                log(`系统信息响应: ${sysInfoResponse}`);
+                log(`System info response: ${sysInfoResponse}`);
                 
-                // 解析系统信息响应，检查时区设置
+                // Parse system info response, check timezone setting
                 const tzMatch = sysInfoResponse.match(/"tz":(\d+)/);
                 if (tzMatch) {
                     const setTz = parseInt(tzMatch[1]);
                     if (setTz === timezoneOffset) {
-                        log(`时区同步成功，设置为 UTC${setTz >= 0 ? '+' : '-'}${Math.abs(setTz / 60)}`);
+                        log(`Timezone sync successful, set to UTC${setTz >= 0 ? '+' : '-'}${Math.abs(setTz / 60)}`);
                     } else {
-                        log(`时区设置不匹配。期望: ${timezoneOffset}, 实际: ${setTz}`);
+                        log(`Timezone setting mismatch. Expected: ${timezoneOffset}, Actual: ${setTz}`);
                     }
                 } else {
-                    log('无法从系统信息中解析时区设置');
+                    log('Unable to parse timezone setting from system info');
                 }
             } catch (error) {
-                log(`获取系统信息失败: ${error.message}`);
+                log(`Failed to get system info: ${error.message}`);
             }
     
         } catch (error) {
-            log(`同步时区失败: ${error.message || error}`);
+            log(`Timezone sync failed: ${error.message || error}`);
             handleError(error);
         }
     }

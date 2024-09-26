@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -116,29 +116,29 @@
 </head>
 <body>
     <div class="container">
-        <h1>EleksTube IPS 时钟控制</h1>
+        <h1>EleksTube IPS Clock Control</h1>
         
-        <!-- 修改：显示本机时间 -->
+        <!-- Modified: Display local time -->
         <div id="local-time"></div>
         
         <div id="bluetooth-section">
-            <h2>蓝牙连接</h2>
-            <button id="scan-button">扫描蓝牙设备</button>
-            <button id="reset-button">重置</button>
+            <h2>Bluetooth Connection</h2>
+            <button id="scan-button">Scan Bluetooth Devices</button>
+            <button id="reset-button">Reset</button>
             <ul id="device-list"></ul>
             <div id="connection-status"></div>
         </div>
         
         <div id="wifi-section" style="display: none;">
-            <h2>Wi-Fi 配置</h2>
+            <h2>Wi-Fi Configuration</h2>
             <form id="wifi-form">
                 <label for="ssid">Wi-Fi SSID:</label>
                 <input type="text" id="ssid" required>
-                <label for="password">Wi-Fi 密码:</label>
+                <label for="password">Wi-Fi Password:</label>
                 <input type="password" id="password" required>
-                <button type="submit">配置 Wi-Fi</button>
-                <button type="button" id="sync-time-button">同步时间</button>
-                <button id="sync-timezone-button">同步时区</button>
+                <button type="submit">Configure Wi-Fi</button>
+                <button type="button" id="sync-time-button">Sync Time</button>
+                <button id="sync-timezone-button">Sync Timezone</button>
             </form>
             <div id="wifi-status"></div>
             <div id="status"></div>
@@ -150,14 +150,14 @@
         </div>
     </div>
 
-    <!-- 修改：版本信息 -->
+    <!-- Modified: Version information -->
     <footer>
-        <p>版本: Commit <a id="version" href="#" target="_blank">加载中...</a></p>
+        <p>Version: Commit <a id="version" href="#" target="_blank">Loading...</a></p>
     </footer>
     
     <script src="app.js"></script>
     <script>
-        // 更新本机时间的函数
+        // Update local time function
         function updateLocalTime() {
             const now = new Date();
             const options = { 
@@ -170,14 +170,14 @@
                 hour12: false,
                 timeZoneName: 'short'
             };
-            document.getElementById('local-time').textContent = '本机时间：' + now.toLocaleString('zh-CN', options);
+            document.getElementById('local-time').textContent = 'Local Time: ' + now.toLocaleString('en-US', options);
         }
 
-        // 每秒更新一次时间
+        // Update time every second
         setInterval(updateLocalTime, 1000);
-        updateLocalTime(); // 立即执行一次，避免页面加载后等待 1 秒
+        updateLocalTime(); // Execute immediately to avoid 1 second delay after page load
 
-        // 获取版本信息并设置链接
+        // Get version information and set link
         fetch('https://api.github.com/repos/bg1ttr/elekstube-web-tool/commits/main')
             .then(response => response.json())
             .then(data => {
@@ -187,8 +187,8 @@
                 versionElement.href = `https://github.com/bg1ttr/elekstube-web-tool/commit/${data.sha}`;
             })
             .catch(error => {
-                console.error('获取版本信息失败:', error);
-                document.getElementById('version').textContent = '无法获取';
+                console.error('Failed to get version information:', error);
+                document.getElementById('version').textContent = 'Unable to retrieve';
             });
     </script>
 </body>

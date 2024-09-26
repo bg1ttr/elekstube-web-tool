@@ -231,13 +231,13 @@
             </pre>
         </div>
             <!-- Modified: Version information -->
-    <footer class="terminal-footer">
-        <p class="copyright-info">Version: Commit <a id="version" href="#" target="_blank">Loading...</a></p>
-        <p class="copyright-info">
-            © 2024 EleksMaker. All rights reserved. | 
-            <a href="https://www.elekstube.com" target="_blank">EleksTube.com</a>
-        </p>
-    </footer>
+            <footer class="terminal-footer">
+                <p class="copyright-info">Version: <span id="version">Loading...</span></p>
+                <p class="copyright-info">
+                    © 2024 EleksMaker. All rights reserved. | 
+                    <a href="https://www.elekstube.com" target="_blank">EleksTube.com</a>
+                </p>
+            </footer>
     </div>
 
 
@@ -268,7 +268,6 @@
         const versionElement = document.getElementById('version');
         const buildDate = new Date().toISOString().split('T')[0]; // Use build date as version
         versionElement.textContent = buildDate;
-        versionElement.href = 'https://github.com/bg1ttr/elekstube-web-tool';
     </script>
 </body>
 

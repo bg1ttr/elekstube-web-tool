@@ -359,56 +359,42 @@ document.addEventListener('DOMContentLoaded', () => {
         log(`Error: ${error.message || error}`);
     }
 
-    async function syncTime() {
-        try {
-            log('Starting time synchronization...');
-            if (!checkBluetoothConnection()) {
-                throw new Error('Bluetooth device not connected');
-            }
-            
-            const now = new Date();
-            const year = now.getFullYear();
-            const month = (now.getMonth() + 1).toString().padStart(2, '0');
-            const day = now.getDate().toString().padStart(2, '0');
-            const hours = now.getHours().toString().padStart(2, '0');
-            const minutes = now.getMinutes().toString().padStart(2, '0');
-            const seconds = now.getSeconds().toString().padStart(2, '0');
+    function syncTime() {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = (now.getMonth() + 1).toString().padStart(2, '0');
+        const day = now.getDate().toString().padStart(2, '0');
+        const hours = now.getHours().toString().padStart(2, '0');
+        const minutes = now.getMinutes().toString().padStart(2, '0');
+        const seconds = now.getSeconds().toString().padStart(2, '0');
+        const show = '0'; // 0 for not showing UI message, 1 for showing
     
-            // Set time
-            const setTimeCommand = `${COMMANDS.SET_TIME} 0 ${year}-${month}-${day} ${hours}:${minutes}:${seconds}\n`;
-            log(`Preparing to send time sync command: ${setTimeCommand}`);
-            await sendCommandWithTimeout(setTimeCommand, 5000);
-            log('Time sync command sent, waiting for response...');
-            
-            // Wait for and validate time sync response
-            const timeResponse = await waitForResponse('#4', 10000);
-            const syncedTime = parseTimeResponse(timeResponse);
-            if (!isTimeValid(syncedTime, now)) {
-                log(`Warning: Device returned incorrect time: ${syncedTime}`);
-                // Attempt to resync time
-                await retryTimeSync(3);
-            } else {
-                log(`Time sync successful, device time: ${syncedTime}`);
+        const setTimeCommand = `${COMMANDS.SET_TIME} ${year} ${month} ${day} ${hours} ${minutes} ${seconds} ${show}\n`;
+        
+        return new Promise(async (resolve, reject) => {
+            try {
+                log(`Sending time sync command: ${setTimeCommand}`);
+                await sendCommandWithTimeout(setTimeCommand, 5000);
+                const response = await waitForResponse('#4', 10000);
+                log(`Received time sync response: ${response}`);
+                
+                // Parse the response to check if time was set correctly
+                const [cmd, status, ...timeParts] = response.split(' ');
+                if (status === '0' && timeParts.length === 6) {
+                    const syncedTime = new Date(timeParts.join(' '));
+                    if (Math.abs(syncedTime - now) < 60000) { // Within 1 minute
+                        log('Time sync successful');
+                        resolve(syncedTime);
+                    } else {
+                        reject(new Error('Time sync failed: Significant time difference'));
+                    }
+                } else {
+                    reject(new Error('Invalid time sync response'));
+                }
+            } catch (error) {
+                reject(error);
             }
-
-            // Set timezone
-            const timezoneOffset = -now.getTimezoneOffset();
-            const setTimezoneCommand = `${COMMANDS.SET_TIME_ZONE} ${timezoneOffset}\n`;
-            log(`Preparing to send timezone setting command: ${setTimezoneCommand}`);
-            await sendCommandWithTimeout(setTimezoneCommand, 5000);
-            log('Timezone setting command sent, waiting for response...');
-            await new Promise(resolve => setTimeout(resolve, 2000)); // Wait for 2 seconds
-    
-            // Check time again to ensure settings were successful
-            const checkTimeCommand = `${COMMANDS.GET_SYS_INFO}\n`;
-            log(`Preparing to send time check command: ${checkTimeCommand}`);
-            await sendCommandWithTimeout(checkTimeCommand, 5000);
-            log('Time check command sent, waiting for response...');
-
-        } catch (error) {
-            log(`Time sync failed: ${error.message || error}`);
-            handleError(error);
-        }
+        });
     }
 
     function checkBluetoothConnection() {
@@ -490,7 +476,7 @@ document.addEventListener('DOMContentLoaded', () => {
         for (let i = 0; i < maxRetries; i++) {
             log(`Attempting to resync time, attempt ${i + 1}...`);
             const now = new Date();
-            const setTimeCommand = `${COMMANDS.SET_TIME} 0 ${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')} ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}\n`;
+            const setTimeCommand = `${COMMANDS.SET_TIME} 0 ${now.toISOString().replace(/T/, ' ').replace(/\..+/, '')}\n`;
             
             await sendCommandWithTimeout(setTimeCommand, 5000);
             const timeResponse = await waitForResponse('#4', 10000);
@@ -504,66 +490,96 @@ document.addEventListener('DOMContentLoaded', () => {
         throw new Error(`Time sync failed after ${maxRetries} attempts`);
     }
 
-    async function syncTimezone() {
+    function syncTimezone() {
+        const now = new Date();
+        const timezoneOffset = -now.getTimezoneOffset(); // JavaScript uses opposite sign
+    
+        const setTimezoneCommand = `${COMMANDS.SET_TIME_ZONE} ${timezoneOffset}\n`;
+        
+        return new Promise(async (resolve, reject) => {
+            try {
+                log(`Sending timezone setting command: ${setTimezoneCommand}`);
+                await sendCommandWithTimeout(setTimezoneCommand, 5000);
+                const response = await waitForResponse('#6', 10000);
+                log(`Received timezone setting response: ${response}`);
+    
+                const [cmd, status, setOffset] = response.split(' ');
+                if (status === '0' && parseInt(setOffset) === timezoneOffset) {
+                    log(`Timezone sync successful, set to UTC${timezoneOffset >= 0 ? '+' : '-'}${Math.abs(timezoneOffset / 60)}`);
+                    resolve(timezoneOffset);
+                } else {
+                    reject(new Error('Timezone sync failed: Mismatch in set value'));
+                }
+            } catch (error) {
+                reject(error);
+            }
+        });
+    }
+    async function verifyTimeSetting() {
+        log('Verifying time setting...');
+        const checkTimeCommand = `${COMMANDS.GET_SYS_INFO}\n`;
+        await sendCommandWithTimeout(checkTimeCommand, 5000);
+        
+        const sysInfoResponse = await waitForResponse('#1', 10000);
+        log(`System info response: ${sysInfoResponse}`);
+        
+        const timeMatch = sysInfoResponse.match(/"time":"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})"/);
+        const tzMatch = sysInfoResponse.match(/"tz":(-?\d+)/);
+        
+        if (timeMatch && tzMatch) {
+            const deviceTime = new Date(timeMatch[1]);
+            const deviceTz = parseInt(tzMatch[1]);
+            const now = new Date();
+            const localTz = -now.getTimezoneOffset();
+            
+            const timeDiff = Math.abs(deviceTime - now);
+            
+            if (timeDiff > 60000 || deviceTz !== localTz) {
+                log(`Time verification failed. Device time: ${deviceTime.toISOString()}, Local time: ${now.toISOString()}`);
+                log(`Device timezone: ${deviceTz}, Local timezone: ${localTz}`);
+                throw new Error('Time or timezone mismatch detected');
+            } else {
+                log('Time and timezone verification successful');
+            }
+        } else {
+            throw new Error('Unable to parse time or timezone from system info');
+        }
+    }
+    async function synchronizeDeviceTime() {
         try {
-            log('Starting timezone synchronization...');
+            log('Starting device time synchronization...');
             if (!checkBluetoothConnection()) {
                 throw new Error('Bluetooth device not connected');
             }
     
-            const localTimezoneOffset = new Date().getTimezoneOffset();
-            const timezoneOffset = -localTimezoneOffset;
-            
-            const setTimezoneCommand = `${COMMANDS.SET_TIME_ZONE} ${timezoneOffset}\n`;
-            
-            log(`Preparing to send timezone setting command: ${setTimezoneCommand}`);
-            await sendCommandWithTimeout(setTimezoneCommand, 5000);
-            log('Timezone setting command sent, waiting for response...');
+            // First, set the timezone
+            await syncTimezone();
     
-            try {
-                const response = await waitForResponse('#6', 15000);
-                log(`Received timezone setting response: ${response}`);
+            // Then, set the time
+            const syncedTime = await syncTime();
     
-                if (response.includes(`0 ${timezoneOffset}`)) {
-                    log(`Timezone sync successful, set to UTC${timezoneOffset >= 0 ? '+' : '-'}${Math.abs(timezoneOffset / 60)}`);
-                    return; // Return directly if successful
-                } else {
-                    log(`Timezone sync response format incorrect: ${response}`);
-                }
-            } catch (error) {
-                if (error.message.includes('timeout')) {
-                    log('Timezone setting response timed out, attempting to verify setting...');
-                } else {
-                    throw error;
-                }
+            // Optionally, verify the time setting
+            const verifiedTime = await checkDeviceTime();
+            if (Math.abs(verifiedTime - syncedTime) > 5000) { // More than 5 seconds difference
+                throw new Error('Time verification failed: Significant time difference after sync');
             }
     
-            // Verify timezone setting
-            log('Attempting to get system info to verify timezone setting...');
-            await sendCommandWithTimeout(`${COMMANDS.GET_SYS_INFO}\n`, 5000);
-            try {
-                const sysInfoResponse = await waitForResponse('#1', 10000);
-                log(`System info response: ${sysInfoResponse}`);
-                
-                // Parse system info response, check timezone setting
-                const tzMatch = sysInfoResponse.match(/"tz":(\d+)/);
-                if (tzMatch) {
-                    const setTz = parseInt(tzMatch[1]);
-                    if (setTz === timezoneOffset) {
-                        log(`Timezone sync successful, set to UTC${setTz >= 0 ? '+' : '-'}${Math.abs(setTz / 60)}`);
-                    } else {
-                        log(`Timezone setting mismatch. Expected: ${timezoneOffset}, Actual: ${setTz}`);
-                    }
-                } else {
-                    log('Unable to parse timezone setting from system info');
-                }
-            } catch (error) {
-                log(`Failed to get system info: ${error.message}`);
-            }
-    
+            log('Device time synchronization completed successfully');
         } catch (error) {
-            log(`Timezone sync failed: ${error.message || error}`);
+            log(`Device time synchronization failed: ${error.message}`);
             handleError(error);
         }
+    }
+    
+    // Helper function to check device time
+    async function checkDeviceTime() {
+        const checkTimeCommand = `${COMMANDS.GET_SYS_INFO}\n`;
+        await sendCommandWithTimeout(checkTimeCommand, 5000);
+        const sysInfoResponse = await waitForResponse('#1', 10000);
+        const timeMatch = sysInfoResponse.match(/"time":"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})"/);
+        if (timeMatch) {
+            return new Date(timeMatch[1]);
+        }
+        throw new Error('Unable to parse time from system info');
     }
 });

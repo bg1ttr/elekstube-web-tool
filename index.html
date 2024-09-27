@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <script src="version.js"></script>
     <!-- Google Tag Manager -->
     <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
     new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
@@ -266,8 +267,7 @@
 
         // Set version information
         const versionElement = document.getElementById('version');
-        const buildDate = new Date().toISOString().split('T')[0]; // Use build date as version
-        versionElement.textContent = buildDate;
+        versionElement.textContent = window.APP_VERSION || 'Unknown';
     </script>
 </body>
 
